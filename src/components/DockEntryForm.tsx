@@ -73,7 +73,7 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
     });
   };
 
-  const [companyUnit, setCompanyUnit] = useState<string>('AHPL (Docks 1 to 4)');
+  const [companyUnit, setCompanyUnit] = useState<CompanyUnit>('AHPL');
   const [assignedDock, setAssignedDock] = useState<string>('Dock 1');
   const [operation, setOperation] = useState<DockOperation>('Loading');
   const [vehicleType, setVehicleType] = useState<VehicleType>('32 Ft Single Axle (SXL)');
@@ -119,7 +119,7 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
     e.preventDefault();
     if (!vehicleNo.trim() || !sealNo.trim() || !location.trim() || !startTime.trim()) return;
 
-    const unitMapped: CompanyUnit = companyUnit.includes('AHPL') ? 'AHPL' : 'AIL';
+    const unitMapped: CompanyUnit = companyUnit === 'AIL' ? 'AIL' : 'AHPL';
     const statusMapped: DockStatus = exitTime.trim() ? 'Completed' : 'In-Progress';
 
     onAddDockRecord({
@@ -154,7 +154,7 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
   };
 
   const handleReset = () => {
-    setCompanyUnit('AHPL (Docks 1 to 4)');
+    setCompanyUnit('AHPL');
     setAssignedDock('Dock 1');
     setOperation('Loading');
     setVehicleType('32 Ft Single Axle (SXL)');
@@ -200,11 +200,11 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
             <select
               id="inpCompany"
               value={companyUnit}
-              onChange={(e) => setCompanyUnit(e.target.value)}
+              onChange={(e) => setCompanyUnit(e.target.value as CompanyUnit)}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-slate-800 shadow-2xs"
             >
-              <option value="AHPL (Docks 1 to 4)">AHPL (Docks 1 to 4)</option>
-              <option value="ICH Logistics Hub">ICH Logistics Hub</option>
+              <option value="AHPL">AHPL (Docks 1 to 4)</option>
+              <option value="AIL">AIL (Docks 5 to 9)</option>
             </select>
           </div>
 
