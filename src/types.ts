@@ -4,7 +4,7 @@ export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
 export type AppTab = 'loading' | 'live' | 'tracker' | 'reports' | 'analytics' | 'movement';
 
-export type DockStatus = 'Completed' | 'In-Progress' | 'Gate-In Waiting';
+export type DockStatus = 'Completed' | 'In-Progress' | 'Gate-In Waiting' | 'Dock Assigned' | 'In Progress (In Dock)' | 'Loaded' | 'Unloaded';
 export type DockOperation = 'Loading' | 'Unloading';
 
 export type VehicleType =
@@ -67,6 +67,7 @@ export interface DockRecord {
   gateNo: string;
   binNo?: string;
   operation: DockOperation;
+  activityType?: DockOperation;
   vehicleType?: VehicleType;
   transporterName?: TransporterName;
   vehicleNo: string;
@@ -80,8 +81,9 @@ export interface DockRecord {
   podStatus?: PodStatus;
   attachedDoc?: AttachedDocument;
   supervisorName: string;
-  startTime: string; // e.g. "09:30" (24h format for math) or formatted
-  exitTime?: string; // e.g. "11:00"
+  inTime?: string; // Gate In / Security In-Time (Time 1)
+  startTime: string; // In Dock Time (Time 2) or operation start
+  exitTime?: string; // Loaded/Unloaded End Time (Time 3)
   status: DockStatus;
   date: string;
   remarks?: string;

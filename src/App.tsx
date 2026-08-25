@@ -246,20 +246,24 @@ export default function App() {
     supervisor?: string;
     gateNo?: string;
     tokenId?: string;
+    activityType?: 'Loading' | 'Unloading';
   }) => {
     const now = new Date();
-    const dateStr = now.toISOString().slice(0, 10);
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateToday = now.toLocaleDateString('en-IN');
+    const fullTimestamp = `${dateToday} ${timeStr}`;
     const tokenSeq = (dockRecords.length + 1).toString().padStart(3, '0');
-    const tokenId = entry.tokenId || `TKN-${tokenSeq}`;
+    const tokenId = entry.tokenId || `TKN-${Math.floor(1000 + Math.random() * 9000)}`;
+    const chosenAct = entry.activityType || 'Loading';
 
     const newDockRecord: DockRecord = {
       id: `DOCK-${Date.now().toString().slice(-4)}`,
       tokenId: tokenId,
       unit: entry.unit,
       gateNo: entry.binNo || entry.gateNo || (entry.unit === 'AIL' ? 'Dock 5' : 'Dock 1'),
-      binNo: entry.binNo || '',
-      operation: 'Loading',
+      binNo: entry.binNo || 'Dock-01',
+      operation: chosenAct,
+      activityType: chosenAct,
       vehicleNo: entry.vehicleNo,
       driverName: entry.driverName,
       driverMobile: entry.driverMobile || '',
@@ -267,9 +271,10 @@ export default function App() {
       locationType: entry.locationType || 'LL',
       cfaLocation: entry.cfaLocation || '',
       supervisorName: entry.supervisor || 'Pending Assignment',
-      startTime: timeStr,
-      status: 'Gate-In Waiting',
-      date: dateStr,
+      inTime: fullTimestamp,
+      startTime: '',
+      status: 'Dock Assigned',
+      date: dateToday,
       podStatus: 'POD Clean',
       remarks: `Gate-In Entry via Security. Driver: ${entry.driverName} ${entry.driverMobile ? `(${entry.driverMobile})` : ''}`,
     };
@@ -293,7 +298,9 @@ export default function App() {
     gateNo: string
   ) => {
     const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateToday = now.toLocaleDateString('en-IN');
+    const fullTimestamp = `${dateToday} ${timeStr}`;
 
     setDockRecords((prev) =>
       prev.map((rec) => {
@@ -301,10 +308,12 @@ export default function App() {
         return {
           ...rec,
           operation: activityType,
+          activityType: activityType,
           supervisorName: supervisorName,
           gateNo: gateNo,
-          startTime: timeStr,
-          status: 'In-Progress' as DockStatus,
+          binNo: gateNo,
+          startTime: fullTimestamp,
+          status: 'In Progress (In Dock)' as DockStatus,
           remarks: `${activityType} started by Supervisor ${supervisorName}`,
         };
       })
@@ -313,16 +322,20 @@ export default function App() {
 
   const handleCloseSupervisorActivity = (id: string) => {
     const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateToday = now.toLocaleDateString('en-IN');
+    const fullTimestamp = `${dateToday} ${timeStr}`;
 
     setDockRecords((prev) =>
       prev.map((rec) => {
         if (rec.id !== id) return rec;
+        const act = rec.activityType || rec.operation || 'Loading';
+        const finalStatus = act === 'Loading' ? 'Loaded' : 'Unloaded';
         return {
           ...rec,
-          exitTime: timeStr,
-          status: 'Completed' as DockStatus,
-          remarks: `Operation closed & dispatched at ${timeStr}`,
+          exitTime: fullTimestamp,
+          status: finalStatus as DockStatus,
+          remarks: `Operation closed & dispatched at ${fullTimestamp}`,
         };
       })
     );
