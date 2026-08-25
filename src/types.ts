@@ -75,6 +75,7 @@ export interface DockRecord {
   driverMobile?: string;
   locationType?: 'LL' | 'TP' | string;
   cfaLocation?: string;
+  location?: string;
   sealNo?: string;
   invoiceNo?: string;
   lrNo?: string;

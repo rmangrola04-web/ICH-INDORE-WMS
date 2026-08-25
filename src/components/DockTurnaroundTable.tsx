@@ -687,8 +687,13 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
                       {/* Vehicle Details & Seal */}
                       <td className="py-3 px-3">
                         <div className="font-bold text-slate-800 font-mono text-sm">{record.vehicleNo}</div>
-                        <div className="text-[11px] text-slate-500 font-normal flex items-center gap-1.5 mt-0.5">
+                        <div className="text-[11px] text-slate-500 font-normal flex flex-wrap items-center gap-1.5 mt-0.5">
                           <span>{record.vehicleType || '32 Ft SXL'} • {record.operation}</span>
+                          {(record.location || record.cfaLocation) && (
+                            <span className="text-blue-700 bg-blue-50 px-1 rounded text-[10px] border border-blue-200 font-medium">
+                              📍 {record.location || record.cfaLocation}
+                            </span>
+                          )}
                           {record.sealNo && (
                             <span className="font-mono text-slate-700 bg-slate-100 px-1 rounded text-[10px] border border-slate-200">
                               🔒 {record.sealNo}

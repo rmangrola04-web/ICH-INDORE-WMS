@@ -33,6 +33,7 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
   const [operation, setOperation] = useState<DockOperation>(record.operation);
   const [vehicleNo, setVehicleNo] = useState<string>(record.vehicleNo);
   const [sealNo, setSealNo] = useState<string>(record.sealNo || '');
+  const [location, setLocation] = useState<string>(record.location || record.cfaLocation || '');
   const [invoiceNo, setInvoiceNo] = useState<string>(record.invoiceNo || '');
   const [lrNo, setLrNo] = useState<string>(record.lrNo || '');
   const [podStatus, setPodStatus] = useState<PodStatus>(record.podStatus || 'POD Clean');
@@ -53,6 +54,8 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
       operation,
       vehicleNo: vehicleNo.trim().toUpperCase(),
       sealNo: sealNo.trim() ? sealNo.trim().toUpperCase() : undefined,
+      location: location.trim() || undefined,
+      cfaLocation: location.trim() || undefined,
       invoiceNo: invoiceNo.trim() ? invoiceNo.trim().toUpperCase() : undefined,
       lrNo: lrNo.trim() ? lrNo.trim().toUpperCase() : undefined,
       podStatus,
@@ -245,6 +248,20 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
                 className="w-full border border-slate-300 rounded-lg p-2 text-sm uppercase font-mono font-semibold shadow-2xs"
               />
             </div>
+          </div>
+
+          {/* Location / Destination */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Location / Destination (Origin / Destination)
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Kolkata / Mumbai / Raipur / Balram CFA"
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm shadow-2xs"
+            />
           </div>
 
           {/* Invoice & LR Number */}

@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Shield,
   Truck,
   Clock,
   CheckCircle2,
   Play,
-  ArrowRight,
   UserCheck,
   RefreshCw,
   KeyRound,
@@ -30,7 +29,12 @@ import {
   Filter,
   ArrowUpRight,
   Building2,
-  Calendar
+  Calendar,
+  Monitor,
+  Smartphone,
+  Sparkles,
+  ChevronRight,
+  X
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, SUPERVISOR_ROSTER, Language } from '../types';
 
@@ -64,19 +68,25 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   onCloseActivity,
   onSyncFromSheet,
 }) => {
-  // Active Navigation sub-tab
-  const [activeSubTab, setActiveSubTab] = useState<'dashboard' | 'taskboard' | 'gateEntry' | 'allRecords'>('taskboard');
+  // View mode switcher: 'auto' | 'desktop' | 'mobile'
+  const [viewMode, setViewMode] = useState<'auto' | 'desktop' | 'mobile'>('auto');
 
-  // Gate In Form State (Driver Mobile, Bay/Bin, Supervisor, Location Type, CFA Location & Activity Type)
+  // Desktop active tab
+  const [desktopTab, setDesktopTab] = useState<'dashboard' | 'taskboard' | 'gateEntry' | 'records'>('dashboard');
+
+  // Mobile active tab
+  const [mobileTab, setMobileTab] = useState<'supervisor' | 'gateEntry' | 'records' | 'stats'>('supervisor');
+  const [mobileSupervisorFilter, setMobileSupervisorFilter] = useState<string>('ALL');
+
+  // Form State (for Gate In Entry)
   const [vehicleNo, setVehicleNo] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverMobile, setDriverMobile] = useState('');
   const [activityType, setActivityType] = useState<'Loading' | 'Unloading' | ''>('Loading');
-  const [transporter, setTransporter] = useState('');
+  const [transporter, setTransporter] = useState('MATA');
   const [otherTransporter, setOtherTransporter] = useState('');
   const [locationType, setLocationType] = useState<string>('LL');
   const [cfaLocation, setCfaLocation] = useState('');
-  const [otherCfaLocation, setOtherCfaLocation] = useState('');
   const [binNo, setBinNo] = useState('Dock-01');
   const [supervisor, setSupervisor] = useState(SUPERVISOR_ROSTER[0]);
   const [unit, setUnit] = useState<CompanyUnit>('AHPL');
@@ -102,7 +112,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  // Exact 14-Column Google Apps Script code snippet matching user's backend
+  // Exact 14-Column Google Apps Script snippet
   const APPS_SCRIPT_SNIPPET = `function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.tryLock(10000);
@@ -155,7 +165,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. Close / Finish Activity (Time 3)
+    // 3. Complete Activity (Time 3)
     if (data.action === "CLOSE_ACTIVITY") {
       var rows = sheet.getDataRange().getValues();
       for (var i = 1; i < rows.length; i++) {
@@ -217,17 +227,18 @@ function doGet() {
     setTimeout(() => setCopiedCode(false), 2500);
   };
 
-  // Live KPI Calculations (matching exactly user's metrics: Total, Dock Assigned, In Progress In Dock, Loaded / Unloaded)
+  // Helper status checkers
   const isWaitingStatus = (r: DockRecord) => r.status === 'Dock Assigned' || r.status === 'Gate-In Waiting';
   const isInDockStatus = (r: DockRecord) => r.status === 'In Progress (In Dock)' || r.status === 'In-Progress';
   const isCompletedStatus = (r: DockRecord) => r.status === 'Loaded' || r.status === 'Unloaded' || r.status === 'Completed';
 
+  // KPI Calculations
+  const totalCount = records.length;
   const assignedWaitingVehicles = useMemo(() => records.filter(isWaitingStatus), [records]);
   const inProgressInDockVehicles = useMemo(() => records.filter(isInDockStatus), [records]);
   const completedVehicles = useMemo(() => records.filter(isCompletedStatus), [records]);
-  const totalCount = records.length;
 
-  // Pipeline specific splits
+  // Loading & Unloading pipeline sets
   const loadingPipelineVehicles = useMemo(() => {
     return records.filter((r) => {
       const act = r.activityType || r.operation || 'Loading';
@@ -242,7 +253,7 @@ function doGet() {
     });
   }, [records]);
 
-  // Transporter Distribution for Charts
+  // Transporter distribution
   const transporterDistribution = useMemo(() => {
     const counts: Record<string, number> = {};
     records.forEach((r) => {
@@ -252,7 +263,16 @@ function doGet() {
     return counts;
   }, [records]);
 
-  // Fetch Live Data from Google Apps Script (doGet) - 14 Columns
+  // Filtered supervisor cards for mobile
+  const mobileFilteredTasks = useMemo(() => {
+    return records.filter((r) => {
+      if (isCompletedStatus(r)) return false;
+      if (mobileSupervisorFilter === 'ALL') return true;
+      return r.supervisorName?.toLowerCase().includes(mobileSupervisorFilter.toLowerCase());
+    });
+  }, [records, mobileSupervisorFilter]);
+
+  // Fetch Live Data from Google Apps Script (doGet)
   const handleFetchFromSheet = async () => {
     const url = appsScriptUrl.trim();
     if (!url) {
@@ -332,8 +352,8 @@ function doGet() {
     }
   };
 
-  // Handle Security Gate Entry Submission (Matching handleGateEntry with payload & webhook fetch)
-  const handleGuardSubmit = async (e: React.FormEvent) => {
+  // Handle Gate Entry Submission
+  const handleGateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleNo.trim() || !driverName.trim()) return;
 
@@ -341,12 +361,7 @@ function doGet() {
     if (selectedTransporter === 'Other') {
       selectedTransporter = otherTransporter.trim() || 'Other';
     } else if (!selectedTransporter) {
-      selectedTransporter = 'Local Transport';
-    }
-
-    let selectedCfa = cfaLocation;
-    if (selectedCfa === 'Other') {
-      selectedCfa = otherCfaLocation.trim() || 'Other';
+      selectedTransporter = 'MATA';
     }
 
     const payload = {
@@ -357,14 +372,13 @@ function doGet() {
       activityType: (activityType as 'Loading' | 'Unloading') || 'Loading',
       transporter: selectedTransporter,
       locationType: locationType || 'LL',
-      cfaLocation: selectedCfa.trim(),
+      cfaLocation: cfaLocation.trim(),
       binNo: binNo.trim() || 'Dock-01',
       supervisor: supervisor.trim() || SUPERVISOR_ROSTER[0],
     };
 
     const generatedToken = `TKN-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // Immediate local state update
     onAddGuardEntry({
       vehicleNo: payload.vehicleNo,
       driverName: payload.driverName,
@@ -385,7 +399,7 @@ function doGet() {
         : `Vehicle Gate Entry successfully recorded! (Token: ${generatedToken})`
     );
 
-    // If Google Apps Script Webhook URL is present, post with no-cors and trigger live sheet sync
+    // Sync to webhook
     if (appsScriptUrl.trim()) {
       try {
         await fetch(appsScriptUrl.trim(), {
@@ -395,7 +409,6 @@ function doGet() {
           body: JSON.stringify(payload),
         });
 
-        // Trigger live sheet refresh after slight delay
         setTimeout(() => {
           handleFetchFromSheet();
         }, 1200);
@@ -404,36 +417,36 @@ function doGet() {
       }
     }
 
-    // Form Reset
+    // Reset Form
     setVehicleNo('');
     setDriverName('');
     setDriverMobile('');
     setActivityType('Loading');
-    setTransporter('');
+    setTransporter('MATA');
     setOtherTransporter('');
     setLocationType('LL');
     setCfaLocation('');
-    setOtherCfaLocation('');
     setBinNo('Dock-01');
     setSupervisor(SUPERVISOR_ROSTER[0]);
     setTimeout(() => setGuardSuccessMsg(null), 4500);
   };
 
+  // Open Start Modal
   const handleOpenStartModal = (record: DockRecord, type: 'Loading' | 'Unloading') => {
     setSelectedTokenToStart(record);
     setChosenActivity(type);
-    setChosenGate(record.binNo || record.gateNo || (record.unit === 'AIL' ? 'Dock-05' : 'Dock-01'));
+    setChosenGate(record.binNo || record.gateNo || 'Dock-01');
     if (record.supervisorName && record.supervisorName !== 'Pending Assignment') {
       setChosenSupervisor(record.supervisorName);
     }
   };
 
+  // Confirm Start (Time 2)
   const handleConfirmStart = async () => {
     if (!selectedTokenToStart) return;
 
     onStartActivity(selectedTokenToStart.id, chosenActivity, chosenSupervisor, chosenGate);
 
-    // Apps Script Sync (Matching START_ACTIVITY: Col 11 activityType, Col 12 Start Time, Col 14 Status)
     if (appsScriptUrl.trim()) {
       try {
         fetch(appsScriptUrl.trim(), {
@@ -448,6 +461,8 @@ function doGet() {
             gateNo: chosenGate,
           }),
         }).catch((err) => console.warn(err));
+
+        setTimeout(() => handleFetchFromSheet(), 1200);
       } catch (err) {
         console.warn(err);
       }
@@ -456,19 +471,10 @@ function doGet() {
     setSelectedTokenToStart(null);
   };
 
+  // Close Activity (Time 3)
   const handleCloseActivityClick = async (record: DockRecord) => {
-    const tokenId = record.tokenId || record.id;
-    const isLoad = (record.activityType || record.operation) === 'Loading';
-    const finalLabel = isLoad ? 'Loaded' : 'Unloaded';
-    const confirmText = lang === 'hi'
-      ? `क्या आप ${tokenId} (${record.vehicleNo}) का कार्य पूर्ण (${finalLabel}) घोषित करना चाहते हैं?`
-      : `Do you want to mark ${tokenId} (${record.vehicleNo}) as ${finalLabel} and close dock operation?`;
-
-    if (!window.confirm(confirmText)) return;
-
     onCloseActivity(record.id);
 
-    // Apps Script Sync (Matching CLOSE_ACTIVITY: Col 13 Close Time, Col 14 Status)
     if (appsScriptUrl.trim()) {
       try {
         fetch(appsScriptUrl.trim(), {
@@ -477,32 +483,31 @@ function doGet() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'CLOSE_ACTIVITY',
-            tokenId: tokenId,
+            tokenId: record.tokenId || record.id,
           }),
         }).catch((err) => console.warn(err));
+
+        setTimeout(() => handleFetchFromSheet(), 1200);
       } catch (err) {
         console.warn(err);
       }
     }
   };
 
-  // Filtered records for Table
+  // Filtered records for table
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      // Search term
       const matchesSearch =
-        !searchTerm.trim() ||
-        r.vehicleNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        searchTerm === '' ||
         (r.tokenId && r.tokenId.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        r.vehicleNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r.driverName && r.driverName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (r.driverMobile && r.driverMobile.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.transporterName && r.transporterName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.cfaLocation && r.cfaLocation.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.binNo && r.binNo.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.supervisorName && r.supervisorName.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (r.locationType && r.locationType.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // Status filter
       if (!matchesSearch) return false;
       if (statusFilter === 'All') return true;
       if (statusFilter === 'Dock Assigned') return isWaitingStatus(r);
@@ -512,128 +517,73 @@ function doGet() {
     });
   }, [records, searchTerm, statusFilter]);
 
+  const showDesktop = viewMode === 'desktop' || (viewMode === 'auto');
+  const showMobile = viewMode === 'mobile' || (viewMode === 'auto');
+
   return (
-    <div className="space-y-6">
-      {/* Top Header Controls */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-              <Truck className="w-5 h-5" />
-            </span>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <span>{lang === 'hi' ? '🚛 वाहन मूवमेंट ट्रैकर (Logistics Ops Hub)' : '🚛 Logistics Ops Hub & Vehicle Tracker'}</span>
-                <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-semibold">
-                  14-Col Sheet Sync
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                {lang === 'hi'
-                  ? '3-स्तरीय समय (Time 1: Gate In, Time 2: In Dock, Time 3: End Time) के साथ लाइव 14-कॉलम Google Sheet doPost/doGet सिंक'
-                  : '3-stage timestamp tracking (Gate In, In-Dock, Loaded/Unloaded) with live 14-column Google Sheet doPost/doGet sync'}
-              </p>
-            </div>
-          </div>
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+      {/* 1. Mode Switcher Top Bar */}
+      <div className="bg-slate-800 text-slate-300 px-4 py-2 flex items-center justify-between text-xs font-semibold">
+        <div className="flex items-center gap-2">
+          <Truck className="w-4 h-4 text-blue-400" />
+          <span className="text-white font-bold">Logistics Ops Hub & Dock Management</span>
+          <span className="hidden sm:inline-block bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded text-[10px] border border-blue-400/30">
+            14-Col Apps Script Sync
+          </span>
         </div>
 
-        {/* Sub-Tabs Selector */}
-        <div className="flex items-center flex-wrap gap-2">
-          <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('dashboard')}
-              className={`px-3 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'dashboard' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>{lang === 'hi' ? 'डैशबोर्ड (Dashboard)' : 'Dashboard'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('taskboard')}
-              className={`px-3 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'taskboard' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <KanbanSquare className="w-3.5 h-3.5" />
-              <span>{lang === 'hi' ? 'टास्क बोर्ड (Task Board)' : 'Task Board'}</span>
-              {assignedWaitingVehicles.length > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${activeSubTab === 'taskboard' ? 'bg-blue-700 text-white' : 'bg-amber-100 text-amber-800'}`}>
-                  {assignedWaitingVehicles.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('gateEntry')}
-              className={`px-3 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'gateEntry' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>{lang === 'hi' ? 'सिक्योरिटी गेट एंट्री (Gate In)' : 'Gate In Entry'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('allRecords')}
-              className={`px-3 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'allRecords' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span>{lang === 'hi' ? 'सभी रिकॉर्ड (Log Report)' : 'Log Report'}</span>
-            </button>
-          </div>
-
-          {/* Sync Button */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-slate-400 mr-1">View Mode:</span>
           <button
             type="button"
-            onClick={handleFetchFromSheet}
-            disabled={isFetchingSheet}
-            className="px-3 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
-            title="Fetch live records from Google Sheet via doGet()"
+            id="btnAutoMode"
+            onClick={() => setViewMode('auto')}
+            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer font-medium ${
+              viewMode === 'auto' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSheet ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{lang === 'hi' ? 'रिफ्रेश करें' : 'Sync Sheet'}</span>
+            Auto
           </button>
-
-          {/* Code Guide Modal Button */}
           <button
             type="button"
-            onClick={() => setShowCodeGuide(!showCodeGuide)}
-            className="px-2.5 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs flex items-center gap-1.5 cursor-pointer font-medium"
-            title="View 14-Column Google Apps Script Code (doPost / doGet)"
+            id="btnDesktopMode"
+            onClick={() => setViewMode('desktop')}
+            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
+              viewMode === 'desktop' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
           >
-            <FileCode className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">14-Col Apps Script</span>
+            <Monitor className="w-3 h-3" />
+            <span>Desktop</span>
           </button>
-
-          {/* Settings Drawer Button */}
           <button
             type="button"
-            onClick={() => setShowWebhookSettings(!showWebhookSettings)}
-            className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs flex items-center gap-1 cursor-pointer"
-            title="Webhook Setup"
+            id="btnMobileMode"
+            onClick={() => setViewMode('mobile')}
+            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
+              viewMode === 'mobile' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
           >
-            <Settings className="w-4 h-4" />
+            <Smartphone className="w-3 h-3" />
+            <span>Mobile</span>
           </button>
         </div>
       </div>
 
       {/* Webhook Configuration Drawer */}
       {showWebhookSettings && (
-        <div className="bg-blue-50/70 border border-blue-200 p-4 rounded-xl text-xs space-y-3 animate-in fade-in">
+        <div className="bg-blue-50 border-b border-blue-200 p-4 text-xs space-y-2">
           <div className="flex items-center justify-between">
             <span className="font-bold text-blue-900 flex items-center gap-1.5">
               <KeyRound className="w-4 h-4 text-blue-600" />
               Google Apps Script Web App URL (doPost & doGet - 14 Columns)
             </span>
-            <span className="text-[11px] text-slate-500">Live 14-column spreadsheet synchronization</span>
+            <button
+              type="button"
+              onClick={() => setShowWebhookSettings(false)}
+              className="text-slate-400 hover:text-slate-700 text-base"
+            >
+              &times;
+            </button>
           </div>
           <div className="flex gap-2">
             <input
@@ -652,25 +602,23 @@ function doGet() {
               Save URL
             </button>
           </div>
-          {webhookStatus && (
-            <p className="text-blue-800 font-semibold">{webhookStatus}</p>
-          )}
+          {webhookStatus && <p className="text-blue-800 font-semibold">{webhookStatus}</p>}
         </div>
       )}
 
       {/* Code Guide Modal */}
       {showCodeGuide && (
-        <div className="bg-slate-900 text-slate-100 p-5 rounded-2xl border border-slate-800 shadow-md space-y-3 text-xs animate-in fade-in">
+        <div className="bg-slate-900 text-slate-100 p-4 border-b border-slate-800 space-y-2 text-xs">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div className="flex items-center gap-2">
               <FileCode className="w-4 h-4 text-blue-400" />
-              <span className="font-bold text-white">Google Sheet Row 1 Header (14 Columns) & Apps Script Code</span>
+              <span className="font-bold text-white">Google Sheet 14-Column Header & Apps Script</span>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition"
+                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
               >
                 {copiedCode ? <Check className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
                 <span>{copiedCode ? 'Copied!' : 'Copy Script'}</span>
@@ -678,839 +626,1010 @@ function doGet() {
               <button
                 type="button"
                 onClick={() => setShowCodeGuide(false)}
-                className="text-slate-400 hover:text-white text-base leading-none cursor-pointer"
+                className="text-slate-400 hover:text-white"
               >
                 &times;
               </button>
             </div>
           </div>
-
-          <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800 text-[11px] text-slate-300 space-y-1">
-            <b>Google Sheet Column Setup (Row 1 Header - 14 Columns):</b>
-            <div className="font-mono text-emerald-400 overflow-x-auto whitespace-nowrap bg-slate-900 p-2 rounded">
-              Token ID | In Time (Time 1) | Vehicle No | Driver Name | Driver Mobile | Transporter | Location Type | CFA / Place Name | Bay / Bin No | Supervisor | Activity Type | Start Time (Time 2) | Close Time (Time 3) | Status
-            </div>
-            <div className="text-[10px] text-slate-400">
-              Columns: A (Token), B (In-Time), C (Vehicle), D (Driver), E (Mobile), F (Transporter), G (LL/TP), H (CFA), I (Bay/Bin), J (Supervisor), K (Activity Type), L (In-Dock Time 2), M (Close Time 3), N (Status: Dock Assigned | In Progress | Loaded | Unloaded)
-            </div>
-          </div>
-
-          <pre className="bg-slate-950 p-3.5 rounded-xl font-mono text-[11px] overflow-x-auto text-emerald-400 border border-slate-800 max-h-64">
+          <pre className="bg-slate-950 p-2.5 rounded-lg font-mono text-[10px] overflow-x-auto text-emerald-400 border border-slate-800 max-h-48">
             {APPS_SCRIPT_SNIPPET}
           </pre>
         </div>
       )}
 
-      {/* KPI SUMMARY CARDS (Matching exact 4 KPI cards in user template) */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Total */}
-        <div className="bg-white p-4.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{lang === 'hi' ? 'कुल गाड़ियां (Total)' : 'Total Vehicles'}</p>
-            <h2 className="text-2xl font-bold text-slate-900 mt-1">{totalCount}</h2>
+      {/* ================= 2. DESKTOP LAYOUT ================= */}
+      <div className={`desktop-layout flex min-h-[620px] ${viewMode === 'mobile' ? 'hidden' : viewMode === 'desktop' ? 'flex' : 'hidden md:flex'}`}>
+        {/* Sidebar */}
+        <aside className="w-60 bg-slate-900 text-white flex flex-col shrink-0 border-r border-slate-800">
+          <div className="p-4 border-b border-slate-800 flex items-center gap-2 font-bold text-blue-400 text-sm">
+            <Truck className="w-5 h-5 text-blue-400" />
+            <span>Logistics Hub</span>
           </div>
-          <span className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-lg">
-            <Truck className="w-6 h-6" />
-          </span>
-        </div>
 
-        {/* 2. Dock Assigned (Waiting) */}
-        <div className="bg-white p-4.5 rounded-xl border border-amber-200 bg-amber-50/20 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">{lang === 'hi' ? 'डॉक असाइन (Waiting)' : 'Dock Assigned (Waiting)'}</p>
-            <h2 className="text-2xl font-bold text-amber-900 mt-1">{assignedWaitingVehicles.length}</h2>
+          <ul className="p-3 space-y-1.5 flex-1 text-sm font-medium">
+            <li>
+              <button
+                type="button"
+                onClick={() => setDesktopTab('dashboard')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition cursor-pointer text-left ${
+                  desktopTab === 'dashboard' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => setDesktopTab('taskboard')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition cursor-pointer text-left ${
+                  desktopTab === 'taskboard' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <span className="flex items-center gap-2.5">
+                  <KanbanSquare className="w-4 h-4" />
+                  <span>Task Board</span>
+                </span>
+                {assignedWaitingVehicles.length > 0 && (
+                  <span className="text-[10px] bg-amber-400 text-amber-950 font-bold px-1.5 py-0.2 rounded-full">
+                    {assignedWaitingVehicles.length}
+                  </span>
+                )}
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => setDesktopTab('gateEntry')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition cursor-pointer text-left ${
+                  desktopTab === 'gateEntry' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <Shield className="w-4 h-4" />
+                <span>Gate In Entry</span>
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                onClick={() => setDesktopTab('records')}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition cursor-pointer text-left ${
+                  desktopTab === 'records' ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>Log Reports</span>
+              </button>
+            </li>
+          </ul>
+
+          <div className="p-3 border-t border-slate-800 space-y-1.5">
+            <button
+              type="button"
+              onClick={() => setShowCodeGuide(!showCodeGuide)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
+            >
+              <FileCode className="w-3.5 h-3.5 text-blue-400" />
+              <span>14-Col Apps Script</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowWebhookSettings(!showWebhookSettings)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
+            >
+              <Settings className="w-3.5 h-3.5 text-slate-400" />
+              <span>Webhook Setup</span>
+            </button>
           </div>
-          <span className="w-12 h-12 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center text-lg">
-            <Clock className="w-6 h-6" />
-          </span>
-        </div>
+        </aside>
 
-        {/* 3. In Progress (In Dock) */}
-        <div className="bg-white p-4.5 rounded-xl border border-cyan-200 bg-cyan-50/20 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-cyan-700 uppercase tracking-wider">{lang === 'hi' ? 'In Progress (In Dock)' : 'In Progress (In Dock)'}</p>
-            <h2 className="text-2xl font-bold text-cyan-900 mt-1">{inProgressInDockVehicles.length}</h2>
-          </div>
-          <span className="w-12 h-12 bg-cyan-100 text-cyan-700 rounded-xl flex items-center justify-center text-lg">
-            <Box className="w-6 h-6" />
-          </span>
-        </div>
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col bg-slate-50 overflow-y-auto">
+          {/* Top Header */}
+          <header className="bg-white px-6 py-4 border-b border-slate-200 flex justify-between items-center sticky top-0 z-20">
+            <div>
+              <h1 id="dPageTitle" className="text-base font-bold text-slate-800">
+                {desktopTab === 'dashboard' && 'Dashboard Overview'}
+                {desktopTab === 'taskboard' && 'Interactive Dock Task Board'}
+                {desktopTab === 'gateEntry' && 'New Vehicle Gate In Entry'}
+                {desktopTab === 'records' && 'Vehicle Movement & Status Logs'}
+              </h1>
+              <p className="text-xs text-slate-500">Live 14-column spreadsheet sync & real-time tracking</p>
+            </div>
 
-        {/* 4. Loaded / Unloaded (Completed) */}
-        <div className="bg-white p-4.5 rounded-xl border border-emerald-200 bg-emerald-50/20 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">{lang === 'hi' ? 'Loaded / Unloaded' : 'Loaded / Unloaded'}</p>
-            <h2 className="text-2xl font-bold text-emerald-900 mt-1">{completedVehicles.length}</h2>
-          </div>
-          <span className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center text-lg">
-            <CheckCircle className="w-6 h-6" />
-          </span>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={handleFetchFromSheet}
+              disabled={isFetchingSheet}
+              className="btn-submit bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSheet ? 'animate-spin' : ''}`} />
+              <span>Refresh Data</span>
+            </button>
+          </header>
 
-      {/* 1. DASHBOARD TAB */}
-      {activeSubTab === 'dashboard' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-          {/* Live Dock Operation Status Breakdown */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-blue-600" />
-              <span>{lang === 'hi' ? 'लाइव डॉक ऑपरेशन स्टेटस' : 'Live Dock Operation Status'}</span>
-            </h3>
-
-            <div className="space-y-3.5 pt-2">
-              {/* Waiting / Dock Assigned bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-amber-700">{lang === 'hi' ? 'डॉक असाइन (Waiting)' : 'Dock Assigned (Waiting)'}</span>
-                  <span>{assignedWaitingVehicles.length} ({totalCount ? Math.round((assignedWaitingVehicles.length / totalCount) * 100) : 0}%)</span>
+          <div className="p-6 space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Vehicles</p>
+                  <h2 id="dKpiTotal" className="text-2xl font-bold text-slate-900 mt-1">{totalCount}</h2>
                 </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${totalCount ? (assignedWaitingVehicles.length / totalCount) * 100 : 0}%` }}
-                  />
+                <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                  <Truck className="w-5 h-5" />
                 </div>
               </div>
 
-              {/* In Progress (In Dock) bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-cyan-700">{lang === 'hi' ? 'In Progress (In Dock)' : 'In Progress (In Dock)'}</span>
-                  <span>{inProgressInDockVehicles.length} ({totalCount ? Math.round((inProgressInDockVehicles.length / totalCount) * 100) : 0}%)</span>
+              <div className="bg-white p-4 rounded-xl border border-amber-200 bg-amber-50/10 shadow-2xs flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider">Dock Assigned</p>
+                  <h2 id="dKpiAssigned" className="text-2xl font-bold text-amber-900 mt-1">{assignedWaitingVehicles.length}</h2>
                 </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-cyan-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${totalCount ? (inProgressInDockVehicles.length / totalCount) * 100 : 0}%` }}
-                  />
+                <div className="w-11 h-11 bg-amber-100 text-amber-800 rounded-lg flex items-center justify-center">
+                  <Clock className="w-5 h-5" />
                 </div>
               </div>
 
-              {/* Completed (Loaded / Unloaded) bar */}
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold">
-                  <span className="text-emerald-700">{lang === 'hi' ? 'Loaded / Unloaded (पूर्ण)' : 'Loaded / Unloaded'}</span>
-                  <span>{completedVehicles.length} ({totalCount ? Math.round((completedVehicles.length / totalCount) * 100) : 0}%)</span>
+              <div className="bg-white p-4 rounded-xl border border-cyan-200 bg-cyan-50/10 shadow-2xs flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-cyan-700 uppercase tracking-wider">In Progress (In Dock)</p>
+                  <h2 id="dKpiInDock" className="text-2xl font-bold text-cyan-900 mt-1">{inProgressInDockVehicles.length}</h2>
                 </div>
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${totalCount ? (completedVehicles.length / totalCount) * 100 : 0}%` }}
-                  />
+                <div className="w-11 h-11 bg-cyan-100 text-cyan-800 rounded-lg flex items-center justify-center">
+                  <Box className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="bg-white p-4 rounded-xl border border-emerald-200 bg-emerald-50/10 shadow-2xs flex justify-between items-center">
+                <div>
+                  <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Loaded / Unloaded</p>
+                  <h2 id="dKpiCompleted" className="text-2xl font-bold text-emerald-900 mt-1">{completedVehicles.length}</h2>
+                </div>
+                <div className="w-11 h-11 bg-emerald-100 text-emerald-800 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5" />
                 </div>
               </div>
             </div>
 
-            {/* Quick summary box */}
-            <div className="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-              <span>Active Vehicles in Yard: <b>{assignedWaitingVehicles.length + inProgressInDockVehicles.length}</b></span>
-              <span className="text-blue-600 font-semibold cursor-pointer hover:underline" onClick={() => setActiveSubTab('taskboard')}>
-                View Pipelines &rarr;
-              </span>
-            </div>
-          </div>
-
-          {/* Transporter Volume Breakdown */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <Truck className="w-4 h-4 text-blue-600" />
-              <span>{lang === 'hi' ? 'ट्रांसपोर्टर अनुसार गाड़ियां' : 'Vehicles by Transporter'}</span>
-            </h3>
-
-            <div className="space-y-2.5 pt-2">
-              {Object.entries(transporterDistribution).map(([tr, countVal]) => {
-                const count = Number(countVal) || 0;
-                const pct = totalCount ? Math.round((count / totalCount) * 100) : 0;
-                return (
-                  <div key={tr} className="space-y-1">
-                    <div className="flex justify-between text-xs font-semibold">
-                      <span className="text-slate-700">{tr}</span>
-                      <span className="text-slate-500">{count} {count > 1 ? 'Vehicles' : 'Vehicle'} ({pct}%)</span>
+            {/* Desktop Tab 1: Dashboard */}
+            {desktopTab === 'dashboard' && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                    <span>Live Dock Operation Status</span>
+                  </h3>
+                  <div className="space-y-3.5 pt-2">
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-amber-700">Dock Assigned (Waiting)</span>
+                        <span>{assignedWaitingVehicles.length} ({totalCount ? Math.round((assignedWaitingVehicles.length / totalCount) * 100) : 0}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div className="bg-amber-500 h-full rounded-full" style={{ width: `${totalCount ? (assignedWaitingVehicles.length / totalCount) * 100 : 0}%` }} />
+                      </div>
                     </div>
-                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%` }}
-                      />
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-cyan-700">In Progress (In Dock)</span>
+                        <span>{inProgressInDockVehicles.length} ({totalCount ? Math.round((inProgressInDockVehicles.length / totalCount) * 100) : 0}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div className="bg-cyan-500 h-full rounded-full" style={{ width: `${totalCount ? (inProgressInDockVehicles.length / totalCount) * 100 : 0}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-emerald-700">Loaded / Unloaded</span>
+                        <span>{completedVehicles.length} ({totalCount ? Math.round((completedVehicles.length / totalCount) * 100) : 0}%)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                        <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${totalCount ? (completedVehicles.length / totalCount) * 100 : 0}%` }} />
+                      </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 2. TASK BOARD TAB (3-Pipeline Kanban: Loading, Unloading, Completed Loaded/Unloaded) */}
-      {activeSubTab === 'taskboard' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Column 1: Loading Pipeline */}
-          <div className="bg-slate-100 rounded-2xl p-4 border border-slate-200 flex flex-col min-h-[500px]">
-            <div className="flex justify-between items-center pb-3 mb-3 border-b-2 border-slate-300 font-bold text-sm text-slate-800">
-              <span className="flex items-center gap-1.5 text-cyan-800">
-                <Box className="w-4 h-4 text-cyan-600" />
-                <span>{lang === 'hi' ? 'लोडिंग पाइपलाइन (Loading)' : 'Loading Pipeline'}</span>
-              </span>
-              <span className="bg-cyan-200 text-cyan-900 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                {loadingPipelineVehicles.length}
-              </span>
-            </div>
-
-            <div className="space-y-3 flex-1 overflow-y-auto">
-              {loadingPipelineVehicles.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 text-xs">
-                  {lang === 'hi' ? 'कोई सक्रिय लोडिंग गाड़ी नहीं है' : 'No active loading vehicles'}
                 </div>
-              ) : (
-                loadingPipelineVehicles.map((v) => {
-                  const isInDock = isInDockStatus(v);
-                  const placeText = v.cfaLocation ? ` | CFA: ${v.cfaLocation}` : '';
 
-                  return (
-                    <div key={v.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-2.5 hover:shadow-sm transition">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                          {v.tokenId || v.id}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          isInDock ? 'bg-cyan-100 text-cyan-800 border border-cyan-300' : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}>
-                          {isInDock ? 'In Progress (In Dock)' : 'Dock Assigned (Waiting)'}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-baseline">
-                        <div className="font-mono font-bold text-slate-900 text-base">{v.vehicleNo}</div>
-                        {v.locationType && (
-                          <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded">
-                            {v.locationType}{placeText}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-slate-600 space-y-1">
-                        <div className="flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span><b>Driver:</b> {v.driverName || 'Driver'} ({v.transporterName || 'ICRL'})</span>
+                <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-4">
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-blue-600" />
+                    <span>Vehicles by Transporter</span>
+                  </h3>
+                  <div className="space-y-2 pt-2">
+                    {Object.entries(transporterDistribution).map(([tr, countVal]) => {
+                      const count = Number(countVal) || 0;
+                      const pct = totalCount ? Math.round((count / totalCount) * 100) : 0;
+                      return (
+                        <div key={tr} className="space-y-1">
+                          <div className="flex justify-between text-xs font-semibold">
+                            <span className="text-slate-700">{tr}</span>
+                            <span className="text-slate-500">{count} ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div className="bg-blue-600 h-full rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
                         </div>
-                        {v.driverMobile && (
-                          <div className="flex items-center gap-1 text-slate-500">
-                            <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <a href={`tel:${v.driverMobile}`} className="hover:underline font-mono text-blue-600 font-semibold">{v.driverMobile}</a>
-                          </div>
-                        )}
-                        {(v.binNo || v.gateNo) && (
-                          <div className="flex items-center gap-1 text-slate-600">
-                            <Layers className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span><b>Dock/Bay:</b> {v.binNo || v.gateNo}</span>
-                          </div>
-                        )}
-                        {v.supervisorName && (
-                          <div className="text-[11px] text-slate-500">
-                            Supervisor: <b className="text-slate-800">{v.supervisorName}</b>
-                          </div>
-                        )}
-                        <div className="text-[10px] text-slate-400 pt-0.5">
-                          Gate In (Time 1): <b>{v.inTime || v.startTime || 'Recorded'}</b>
-                        </div>
-                        {isInDock && v.startTime && (
-                          <div className="text-[10px] text-cyan-700 font-semibold">
-                            In-Dock (Time 2): {v.startTime}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action buttons based on status */}
-                      {!isInDock ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStartModal(v, 'Loading')}
-                          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <Play className="w-3.5 h-3.5" />
-                          <span>Start In-Dock (Time 2)</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleCloseActivityClick(v)}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Finish & Loaded (Time 3)</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Column 2: Unloading Pipeline */}
-          <div className="bg-slate-100 rounded-2xl p-4 border border-slate-200 flex flex-col min-h-[500px]">
-            <div className="flex justify-between items-center pb-3 mb-3 border-b-2 border-slate-300 font-bold text-sm text-slate-800">
-              <span className="flex items-center gap-1.5 text-purple-800">
-                <Truck className="w-4 h-4 text-purple-600" />
-                <span>{lang === 'hi' ? 'अनलोडिंग पाइपलाइन (Unloading)' : 'Unloading Pipeline'}</span>
-              </span>
-              <span className="bg-purple-200 text-purple-900 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                {unloadingPipelineVehicles.length}
-              </span>
-            </div>
-
-            <div className="space-y-3 flex-1 overflow-y-auto">
-              {unloadingPipelineVehicles.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 text-xs">
-                  {lang === 'hi' ? 'कोई सक्रिय अनलोडिंग गाड़ी नहीं है' : 'No active unloading vehicles'}
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                unloadingPipelineVehicles.map((v) => {
-                  const isInDock = isInDockStatus(v);
-                  const placeText = v.cfaLocation ? ` | CFA: ${v.cfaLocation}` : '';
-
-                  return (
-                    <div key={v.id} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-2.5 hover:shadow-sm transition">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-mono font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">
-                          {v.tokenId || v.id}
-                        </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          isInDock ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-amber-100 text-amber-800 border border-amber-200'
-                        }`}>
-                          {isInDock ? 'In Progress (In Dock)' : 'Dock Assigned (Waiting)'}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-baseline">
-                        <div className="font-mono font-bold text-slate-900 text-base">{v.vehicleNo}</div>
-                        {v.locationType && (
-                          <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-800 px-1.5 py-0.5 rounded">
-                            {v.locationType}{placeText}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="text-xs text-slate-600 space-y-1">
-                        <div className="flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span><b>Driver:</b> {v.driverName || 'Driver'} ({v.transporterName || 'ICRL'})</span>
-                        </div>
-                        {v.driverMobile && (
-                          <div className="flex items-center gap-1 text-slate-500">
-                            <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                            <a href={`tel:${v.driverMobile}`} className="hover:underline font-mono text-blue-600 font-semibold">{v.driverMobile}</a>
-                          </div>
-                        )}
-                        {(v.binNo || v.gateNo) && (
-                          <div className="flex items-center gap-1 text-slate-600">
-                            <Layers className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                            <span><b>Dock/Bay:</b> {v.binNo || v.gateNo}</span>
-                          </div>
-                        )}
-                        {v.supervisorName && (
-                          <div className="text-[11px] text-slate-500">
-                            Supervisor: <b className="text-slate-800">{v.supervisorName}</b>
-                          </div>
-                        )}
-                        <div className="text-[10px] text-slate-400 pt-0.5">
-                          Gate In (Time 1): <b>{v.inTime || v.startTime || 'Recorded'}</b>
-                        </div>
-                        {isInDock && v.startTime && (
-                          <div className="text-[10px] text-purple-700 font-semibold">
-                            In-Dock (Time 2): {v.startTime}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Action buttons based on status */}
-                      {!isInDock ? (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenStartModal(v, 'Unloading')}
-                          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <Play className="w-3.5 h-3.5" />
-                          <span>Start In-Dock (Time 2)</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleCloseActivityClick(v)}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Finish & Unloaded (Time 3)</span>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Column 3: Completed Pipeline (Loaded / Unloaded) */}
-          <div className="bg-slate-100 rounded-2xl p-4 border border-slate-200 flex flex-col min-h-[500px]">
-            <div className="flex justify-between items-center pb-3 mb-3 border-b-2 border-slate-300 font-bold text-sm text-slate-800">
-              <span className="flex items-center gap-1.5 text-emerald-800">
-                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                <span>{lang === 'hi' ? 'पूर्ण (Loaded / Unloaded)' : 'Completed (Loaded / Unloaded)'}</span>
-              </span>
-              <span className="bg-emerald-200 text-emerald-900 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                {completedVehicles.length}
-              </span>
-            </div>
-
-            <div className="space-y-3 flex-1 overflow-y-auto">
-              {completedVehicles.length === 0 ? (
-                <div className="py-16 text-center text-slate-400 text-xs">
-                  {lang === 'hi' ? 'कोई पूर्ण गाड़ी नहीं है' : 'No completed vehicles'}
-                </div>
-              ) : (
-                completedVehicles.map((v) => {
-                  const isLoaded = v.status === 'Loaded' || v.operation === 'Loading';
-                  const finalTag = v.status === 'Loaded' || v.status === 'Unloaded' ? v.status : isLoaded ? 'Loaded' : 'Unloaded';
-
-                  return (
-                    <div key={v.id} className="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-xs space-y-2 opacity-95 hover:opacity-100 transition">
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded">
-                          {v.tokenId || v.id}
-                        </span>
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
-                          {finalTag}
-                        </span>
-                      </div>
-
-                      <div className="font-mono font-bold text-slate-900 text-base">{v.vehicleNo}</div>
-
-                      <div className="text-xs text-slate-600 space-y-1">
-                        <div><b>Transporter:</b> {v.transporterName || 'ICRL'} | {v.driverName}</div>
-                        {v.driverMobile && (
-                          <div className="text-[11px] text-slate-500 font-mono">Mobile: {v.driverMobile}</div>
-                        )}
-                        <div className="grid grid-cols-1 gap-0.5 text-[11px] bg-slate-50 p-2 rounded-lg border border-slate-100">
-                          <div>Gate In (Time 1): <b>{v.inTime || v.startTime || '-'}</b></div>
-                          <div>In Dock (Time 2): <b>{v.startTime || '-'}</b></div>
-                          <div>End Time (Time 3): <b className="text-emerald-700">{v.exitTime || 'Closed'}</b></div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. GATE ENTRY TAB */}
-      {activeSubTab === 'gateEntry' && (
-        <section id="gateEntrySec" className="tab-section max-w-4xl mx-auto">
-          <div className="panel-card bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
-            <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                <Truck className="w-5 h-5 text-blue-600" />
-                <span>New Vehicle Gate Entry Form (Security)</span>
-              </h3>
-              <span className="text-xs text-slate-500 font-medium">Security Gate In-Time (Time 1)</span>
-            </div>
-
-            {guardSuccessMsg && (
-              <div className="bg-emerald-50 border border-emerald-300 p-4 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>{guardSuccessMsg}</span>
               </div>
             )}
 
-            <form id="gateInForm" onSubmit={handleGuardSubmit} className="space-y-5">
-              {/* Row 1: Vehicle No, Driver Name, Driver Mobile */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Vehicle Number*
-                  </label>
+            {/* Desktop Tab 2: Task Board */}
+            {desktopTab === 'taskboard' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Column 1: Loading Pipeline */}
+                <div className="bg-slate-100 rounded-xl p-4 border border-slate-200 flex flex-col min-h-[460px]">
+                  <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-slate-300 font-bold text-sm text-slate-800">
+                    <span className="flex items-center gap-1.5 text-cyan-800">
+                      <Box className="w-4 h-4 text-cyan-600" />
+                      <span>Loading Pipeline</span>
+                    </span>
+                    <span className="bg-cyan-200 text-cyan-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                      {loadingPipelineVehicles.length}
+                    </span>
+                  </div>
+
+                  <div id="dLoadingCards" className="space-y-3 flex-1 overflow-y-auto">
+                    {loadingPipelineVehicles.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs">No active loading vehicles</div>
+                    ) : (
+                      loadingPipelineVehicles.map((v) => {
+                        const isInDock = isInDockStatus(v);
+                        return (
+                          <div key={v.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                                {v.tokenId || v.id}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isInDock ? 'bg-cyan-100 text-cyan-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isInDock ? 'In Progress' : 'Dock Assigned'}
+                              </span>
+                            </div>
+                            <div className="font-mono font-bold text-slate-900 text-sm">{v.vehicleNo}</div>
+                            <div className="text-xs text-slate-600 space-y-0.5">
+                              <div><b>Driver:</b> {v.driverName} ({v.transporterName || 'ICRL'})</div>
+                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock-01'} | <b>Supervisor:</b> {v.supervisorName}</div>
+                            </div>
+                            {!isInDock ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenStartModal(v, 'Loading')}
+                                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-1.5 px-3 rounded text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                              >
+                                <Play className="w-3 h-3" />
+                                <span>Start In-Dock</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleCloseActivityClick(v)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Complete Loading</span>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Column 2: Unloading Pipeline */}
+                <div className="bg-slate-100 rounded-xl p-4 border border-slate-200 flex flex-col min-h-[460px]">
+                  <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-slate-300 font-bold text-sm text-slate-800">
+                    <span className="flex items-center gap-1.5 text-purple-800">
+                      <Truck className="w-4 h-4 text-purple-600" />
+                      <span>Unloading Pipeline</span>
+                    </span>
+                    <span className="bg-purple-200 text-purple-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                      {unloadingPipelineVehicles.length}
+                    </span>
+                  </div>
+
+                  <div id="dUnloadingCards" className="space-y-3 flex-1 overflow-y-auto">
+                    {unloadingPipelineVehicles.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs">No active unloading vehicles</div>
+                    ) : (
+                      unloadingPipelineVehicles.map((v) => {
+                        const isInDock = isInDockStatus(v);
+                        return (
+                          <div key={v.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[11px] font-mono font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">
+                                {v.tokenId || v.id}
+                              </span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                isInDock ? 'bg-purple-100 text-purple-800' : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {isInDock ? 'In Progress' : 'Dock Assigned'}
+                              </span>
+                            </div>
+                            <div className="font-mono font-bold text-slate-900 text-sm">{v.vehicleNo}</div>
+                            <div className="text-xs text-slate-600 space-y-0.5">
+                              <div><b>Driver:</b> {v.driverName} ({v.transporterName || 'ICRL'})</div>
+                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock-01'} | <b>Supervisor:</b> {v.supervisorName}</div>
+                            </div>
+                            {!isInDock ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenStartModal(v, 'Unloading')}
+                                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-1.5 px-3 rounded text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                              >
+                                <Play className="w-3 h-3" />
+                                <span>Start In-Dock</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleCloseActivityClick(v)}
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded text-xs font-bold transition cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Complete Unloading</span>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Column 3: Completed */}
+                <div className="bg-slate-100 rounded-xl p-4 border border-slate-200 flex flex-col min-h-[460px]">
+                  <div className="flex justify-between items-center pb-2.5 mb-3 border-b border-slate-300 font-bold text-sm text-slate-800">
+                    <span className="flex items-center gap-1.5 text-emerald-800">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span>Completed</span>
+                    </span>
+                    <span className="bg-emerald-200 text-emerald-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                      {completedVehicles.length}
+                    </span>
+                  </div>
+
+                  <div id="dCompletedCards" className="space-y-3 flex-1 overflow-y-auto max-h-[500px]">
+                    {completedVehicles.length === 0 ? (
+                      <div className="py-12 text-center text-slate-400 text-xs">No completed vehicles today</div>
+                    ) : (
+                      completedVehicles.slice(0, 10).map((v) => (
+                        <div key={v.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-mono font-bold text-slate-700">{v.tokenId || v.id}</span>
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                              {v.status}
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-slate-900 text-sm">{v.vehicleNo}</div>
+                          <div className="text-[11px] text-slate-500">
+                            {v.driverName} • {v.transporterName}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Desktop Tab 3: Gate Entry Form */}
+            {desktopTab === 'gateEntry' && (
+              <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-2xs space-y-4">
+                <h3 className="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">
+                  New Vehicle Gate Entry & Dock Assignment Form
+                </h3>
+
+                {guardSuccessMsg && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>{guardSuccessMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleGateSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
+                      <input
+                        type="text"
+                        id="dVehicleNo"
+                        value={vehicleNo}
+                        onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
+                        placeholder="e.g. MP09 AB 1234"
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono uppercase"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Driver Name*</label>
+                      <input
+                        type="text"
+                        id="dDriverName"
+                        value={driverName}
+                        onChange={(e) => setDriverName(e.target.value)}
+                        placeholder="Driver Name"
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Driver Mobile*</label>
+                      <input
+                        type="tel"
+                        id="dDriverMobile"
+                        value={driverMobile}
+                        onChange={(e) => setDriverMobile(e.target.value)}
+                        placeholder="10-digit mobile"
+                        pattern="[0-9]{10}"
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Assigned Purpose*</label>
+                      <select
+                        id="dActivityType"
+                        value={activityType}
+                        onChange={(e) => setActivityType(e.target.value as any)}
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white"
+                      >
+                        <option value="Loading">Loading</option>
+                        <option value="Unloading">Unloading</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Transporter Name*</label>
+                      <select
+                        id="dTransporter"
+                        value={transporter}
+                        onChange={(e) => setTransporter(e.target.value)}
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white"
+                      >
+                        <option value="MATA">MATA</option>
+                        <option value="DHTC">DHTC</option>
+                        <option value="ICRL">ICRL</option>
+                        <option value="OPM">OPM</option>
+                        <option value="VARUNA">VARUNA</option>
+                        <option value="FLY GREEN">FLY GREEN</option>
+                        <option value="JEET">JEET</option>
+                        <option value="MCM">MCM</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Location Type*</label>
+                      <select
+                        id="dLocationType"
+                        value={locationType}
+                        onChange={(e) => setLocationType(e.target.value)}
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white"
+                      >
+                        <option value="LL">LL</option>
+                        <option value="Third Party">Third Party</option>
+                        <option value="Stock Transfer">Stock Transfer</option>
+                        <option value="Invoice">Invoice</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Place / CFA (Optional)</label>
+                      <input
+                        type="text"
+                        id="dCfaLocation"
+                        value={cfaLocation}
+                        onChange={(e) => setCfaLocation(e.target.value)}
+                        placeholder="e.g. Kolkata / Balram CFA"
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Assigned Dock / Bay No*</label>
+                      <select
+                        id="dBinNo"
+                        value={binNo}
+                        onChange={(e) => setBinNo(e.target.value)}
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-mono"
+                      >
+                        <option value="Dock-01">Dock-01</option>
+                        <option value="Dock-02">Dock-02</option>
+                        <option value="Dock-03">Dock-03</option>
+                        <option value="Dock-04">Dock-04</option>
+                        <option value="Dock-05">Dock-05</option>
+                        <option value="Dock-06">Dock-06</option>
+                        <option value="Dock-07">Dock-07</option>
+                        <option value="Dock-08">Dock-08</option>
+                        <option value="Dock-09">Dock-09</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Supervisor In-Charge*</label>
+                      <select
+                        id="dSupervisor"
+                        value={supervisor}
+                        onChange={(e) => setSupervisor(e.target.value)}
+                        required
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white"
+                      >
+                        <option value="Ankit Dayal">Ankit Dayal</option>
+                        <option value="Sanjay Sharma">Sanjay Sharma</option>
+                        <option value="Vikas Patel">Vikas Patel</option>
+                        <option value="Rahul Verma">Rahul Verma</option>
+                        <option value="Amit Kumar">Amit Kumar</option>
+                        <option value="Suman Singh">Suman Singh</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn-submit w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg text-sm transition cursor-pointer flex items-center justify-center gap-2 mt-4"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Record Gate In (Generate Token)</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Desktop Tab 4: Records Table */}
+            {desktopTab === 'records' && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <h3 className="font-bold text-slate-800 text-base">Vehicle History & Status Logs</h3>
+                  <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search vehicle, driver..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs w-52 focus:outline-none"
+                      />
+                    </div>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Dock Assigned">Dock Assigned</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Loaded / Unloaded">Loaded / Unloaded</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-700 border-b border-slate-200">
+                        <th className="py-2.5 px-3 font-bold">Token</th>
+                        <th className="py-2.5 px-3 font-bold">Vehicle No</th>
+                        <th className="py-2.5 px-3 font-bold">Driver</th>
+                        <th className="py-2.5 px-3 font-bold">Activity</th>
+                        <th className="py-2.5 px-3 font-bold">Transporter</th>
+                        <th className="py-2.5 px-3 font-bold">Location</th>
+                        <th className="py-2.5 px-3 font-bold">Dock</th>
+                        <th className="py-2.5 px-3 font-bold">Supervisor</th>
+                        <th className="py-2.5 px-3 font-bold">Gate In</th>
+                        <th className="py-2.5 px-3 font-bold">In Dock</th>
+                        <th className="py-2.5 px-3 font-bold">End Time</th>
+                        <th className="py-2.5 px-3 font-bold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dRecordsTableBody" className="divide-y divide-slate-100">
+                      {filteredRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={12} className="py-8 text-center text-slate-400">No records found</td>
+                        </tr>
+                      ) : (
+                        filteredRecords.map((r) => (
+                          <tr key={r.id} className="hover:bg-slate-50">
+                            <td className="py-2.5 px-3 font-mono font-bold text-blue-700">{r.tokenId || r.id}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{r.vehicleNo}</td>
+                            <td className="py-2.5 px-3">{r.driverName}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                (r.activityType || r.operation) === 'Loading' ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                {r.activityType || r.operation || 'Loading'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-700">{r.transporterName || 'ICRL'}</td>
+                            <td className="py-2.5 px-3">{r.cfaLocation || r.locationType || '-'}</td>
+                            <td className="py-2.5 px-3 font-mono">{r.binNo || r.gateNo || '-'}</td>
+                            <td className="py-2.5 px-3">{r.supervisorName || '-'}</td>
+                            <td className="py-2.5 px-3 font-mono text-[11px]">{r.inTime || r.startTime || '-'}</td>
+                            <td className="py-2.5 px-3 font-mono text-[11px]">{isInDockStatus(r) || isCompletedStatus(r) ? r.startTime : '-'}</td>
+                            <td className="py-2.5 px-3 font-mono text-[11px]">{isCompletedStatus(r) ? r.exitTime : '-'}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                isCompletedStatus(r)
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : isInDockStatus(r)
+                                  ? 'bg-cyan-100 text-cyan-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {r.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* ================= 3. MOBILE LAYOUT ================= */}
+      <div className={`mobile-layout pb-20 ${viewMode === 'desktop' ? 'hidden' : viewMode === 'mobile' ? 'block' : 'block md:hidden'}`}>
+        {/* Mobile Header */}
+        <header className="mobile-header bg-slate-900 text-white px-4 py-3 flex justify-between items-center sticky top-0 z-30">
+          <h2 className="text-sm font-bold flex items-center gap-2 text-white">
+            <Truck className="w-4 h-4 text-blue-400" />
+            <span>Dock Ops App</span>
+          </h2>
+          <button
+            type="button"
+            onClick={handleFetchFromSheet}
+            disabled={isFetchingSheet}
+            className="text-white p-1 hover:text-blue-300 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetchingSheet ? 'animate-spin' : ''}`} />
+          </button>
+        </header>
+
+        <div className="p-4 space-y-4">
+          {/* Mobile Tab 1: Supervisor Tasks */}
+          {mobileTab === 'supervisor' && (
+            <div className="space-y-3">
+              {/* Supervisor Selector Box */}
+              <div className="supervisor-select-box bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                  Supervisor Filter
+                </label>
+                <select
+                  id="mSupervisorSelector"
+                  value={mobileSupervisorFilter}
+                  onChange={(e) => setMobileSupervisorFilter(e.target.value)}
+                  className="w-full p-2.5 border-2 border-blue-600 rounded-lg text-sm font-bold text-blue-900 bg-white focus:outline-none"
+                >
+                  <option value="ALL">-- Show All Tasks ({mobileFilteredTasks.length}) --</option>
+                  <option value="Ankit Dayal">Ankit Dayal</option>
+                  <option value="Sanjay Sharma">Sanjay Sharma</option>
+                  <option value="Vikas Patel">Vikas Patel</option>
+                  <option value="Rahul Verma">Rahul Verma</option>
+                  <option value="Amit Kumar">Amit Kumar</option>
+                  <option value="Suman Singh">Suman Singh</option>
+                </select>
+              </div>
+
+              {/* Task Cards List */}
+              <div id="mSupervisorCardList" className="space-y-3">
+                {mobileFilteredTasks.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-xs text-slate-400">
+                    No pending vehicles assigned to this supervisor.
+                  </div>
+                ) : (
+                  mobileFilteredTasks.map((task) => {
+                    const isInDock = isInDockStatus(task);
+                    const act = task.activityType || task.operation || 'Loading';
+
+                    return (
+                      <div key={task.id} className="m-card bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                              {task.tokenId || task.id}
+                            </span>
+                            <div className="m-vehicle text-base font-extrabold text-slate-900 font-mono mt-1">
+                              {task.vehicleNo}
+                            </div>
+                          </div>
+                          <span className="m-dock bg-blue-50 text-blue-800 font-bold px-2 py-1 rounded text-xs">
+                            {task.binNo || task.gateNo || 'Dock-01'}
+                          </span>
+                        </div>
+
+                        <div className="m-details text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                          <div><b>Driver:</b> {task.driverName} {task.driverMobile && `(${task.driverMobile})`}</div>
+                          <div><b>Transporter:</b> {task.transporterName || 'ICRL'} • <b>Purpose:</b> {act}</div>
+                          <div><b>Supervisor:</b> <span className="text-blue-700 font-semibold">{task.supervisorName}</span></div>
+                          <div className="text-[10px] text-slate-400">Gate In: {task.inTime || task.startTime || 'Recorded'}</div>
+                        </div>
+
+                        {!isInDock ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStartModal(task, act as any)}
+                            className="m-btn m-btn-start w-full py-2.5 px-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5" />
+                            <span>Start In-Dock Activity (Time 2)</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleCloseActivityClick(task)}
+                            className="m-btn m-btn-complete w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Complete Activity (Time 3)</span>
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile Tab 2: Gate Entry */}
+          {mobileTab === 'gateEntry' && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+              <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2">
+                Gate In Entry (Security)
+              </h3>
+
+              {guardSuccessMsg && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{guardSuccessMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleGateSubmit} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
                   <input
                     type="text"
-                    id="inpVehicleNo"
+                    id="mVehicleNo"
                     value={vehicleNo}
                     onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
                     placeholder="e.g. MP09 AB 1234"
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono uppercase"
                   />
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Driver Name*
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Driver Name*</label>
                   <input
                     type="text"
-                    id="inpDriverName"
+                    id="mDriverName"
                     value={driverName}
                     onChange={(e) => setDriverName(e.target.value)}
-                    placeholder="e.g. Ramesh Kumar"
+                    placeholder="Driver Name"
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                   />
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Driver Mobile*
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Driver Mobile*</label>
                   <input
                     type="tel"
-                    id="inpDriverMobile"
+                    id="mDriverMobile"
                     value={driverMobile}
                     onChange={(e) => setDriverMobile(e.target.value)}
-                    placeholder="e.g. 9876543210"
+                    placeholder="10-digit mobile"
                     pattern="[0-9]{10}"
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                    className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
                   />
                 </div>
-              </div>
-
-              {/* Row 2: Activity Purpose, Transporter Dropdown, Location Type Dropdown */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Assigned Purpose (कार्य चुनें)*
-                  </label>
-                  <select
-                    id="inpActivityType"
-                    value={activityType}
-                    onChange={(e) => setActivityType(e.target.value as 'Loading' | 'Unloading' | '')}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="Loading">📦 Loading के लिए</option>
-                    <option value="Unloading">📥 Unloading के लिए</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Transporter Name (ट्रांसपोर्टर चुनें)*
-                  </label>
-                  <select
-                    id="inpTransporter"
-                    value={transporter}
-                    onChange={(e) => setTransporter(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="">-- चुनें (Select Transporter) --</option>
-                    <option value="DHTC">DHTC</option>
-                    <option value="V-Trans">V-Trans</option>
-                    <option value="TCI Freight">TCI Freight</option>
-                    <option value="SafeXpress">SafeXpress</option>
-                    <option value="Spoton">Spoton</option>
-                    <option value="ARC">ARC</option>
-                    <option value="Gati-KWE">Gati-KWE</option>
-                    <option value="Delhivery">Delhivery</option>
-                    <option value="Blue Dart">Blue Dart</option>
-                    <option value="Mata Transport">Mata Transport</option>
-                    <option value="Local Transport">Local Transport / Private</option>
-                    <option value="Other">Other (अन्य ट्रांसपोर्टर)</option>
-                  </select>
-                  {transporter === 'Other' && (
-                    <input
-                      type="text"
-                      id="inpTransporterOther"
-                      value={otherTransporter}
-                      onChange={(e) => setOtherTransporter(e.target.value)}
-                      placeholder="ट्रांसपोर्टर का नाम लिखें"
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Purpose*</label>
+                    <select
+                      id="mActivityType"
+                      value={activityType}
+                      onChange={(e) => setActivityType(e.target.value as any)}
                       required
-                      className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-blue-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-blue-50/50"
-                    />
-                  )}
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Location Type (लोकेशन / बिलिंग टाइप)*
-                  </label>
-                  <select
-                    id="inpLocationType"
-                    value={locationType}
-                    onChange={(e) => setLocationType(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="LL">LL (Local / Own Hub)</option>
-                    <option value="TP">TP (Third Party / Long Haul)</option>
-                    <option value="Stock Transfer">Stock Transfer (स्टॉक ट्रांसफर)</option>
-                    <option value="Billing">Billing / Invoicing (बिलिंग)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 3: Place/CFA Dropdown, Assigned Dock Dropdown, Supervisor */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Place of CFA / Destination (स्थान/CFA चुनें)*
-                  </label>
-                  <select
-                    id="inpCfaLocation"
-                    value={cfaLocation}
-                    onChange={(e) => setCfaLocation(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="">-- स्थान / CFA चुनें --</option>
-                    <option value="Kolkata">Kolkata (कोलकाता)</option>
-                    <option value="Mumbai">Mumbai (मुंबई)</option>
-                    <option value="Delhi / NCR">Delhi / NCR</option>
-                    <option value="Raipur">Raipur (रायपुर)</option>
-                    <option value="Ahmedabad">Ahmedabad (अहमदाबाद)</option>
-                    <option value="Jaipur">Jaipur (जयपुर)</option>
-                    <option value="Indore Hub">Indore Local / Hub</option>
-                    <option value="बलराम CFA">बलराम CFA</option>
-                    <option value="Other">Other (अन्य शहर दर्ज करें)</option>
-                  </select>
-                  {cfaLocation === 'Other' && (
-                    <input
-                      type="text"
-                      id="inpLocationOther"
-                      value={otherCfaLocation}
-                      onChange={(e) => setOtherCfaLocation(e.target.value)}
-                      placeholder="शहर / CFA का नाम लिखें"
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white"
+                    >
+                      <option value="Loading">Loading</option>
+                      <option value="Unloading">Unloading</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Transporter*</label>
+                    <select
+                      id="mTransporter"
+                      value={transporter}
+                      onChange={(e) => setTransporter(e.target.value)}
                       required
-                      className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-blue-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-blue-50/50"
-                    />
-                  )}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white"
+                    >
+                      <option value="MATA">MATA</option>
+                      <option value="DHTC">DHTC</option>
+                      <option value="ICRL">ICRL</option>
+                      <option value="OPM">OPM</option>
+                      <option value="VARUNA">VARUNA</option>
+                      <option value="FLY GREEN">FLY GREEN</option>
+                      <option value="JEET">JEET</option>
+                      <option value="MCM">MCM</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Assigned Dock / Bay (डॉक चुनें)*
-                  </label>
-                  <select
-                    id="inpBinNo"
-                    value={binNo}
-                    onChange={(e) => setBinNo(e.target.value)}
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer font-mono"
-                  >
-                    <option value="Dock-01">Dock-01</option>
-                    <option value="Dock-02">Dock-02</option>
-                    <option value="Dock-03">Dock-03</option>
-                    <option value="Dock-04">Dock-04</option>
-                    <option value="Dock-05">Dock-05</option>
-                    <option value="Dock-06">Dock-06</option>
-                    <option value="Dock-07">Dock-07</option>
-                    <option value="Dock-08">Dock-08</option>
-                    <option value="Dock-09">Dock-09</option>
-                    <option value="Dock-10">Dock-10</option>
-                    <option value="Dock-15">Dock-15</option>
-                    <option value="Dock-19">Dock-19</option>
-                    <option value="Dock-20">Dock-20</option>
-                    <option value="Bay-01">Bay-01</option>
-                    <option value="Bay-02">Bay-02</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Dock / Bay*</label>
+                    <select
+                      id="mBinNo"
+                      value={binNo}
+                      onChange={(e) => setBinNo(e.target.value)}
+                      required
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white font-mono"
+                    >
+                      <option value="Dock-01">Dock-01</option>
+                      <option value="Dock-02">Dock-02</option>
+                      <option value="Dock-03">Dock-03</option>
+                      <option value="Dock-04">Dock-04</option>
+                      <option value="Dock-05">Dock-05</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Supervisor*</label>
+                    <select
+                      id="mSupervisor"
+                      value={supervisor}
+                      onChange={(e) => setSupervisor(e.target.value)}
+                      required
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white"
+                    >
+                      <option value="Ankit Dayal">Ankit Dayal</option>
+                      <option value="Sanjay Sharma">Sanjay Sharma</option>
+                      <option value="Vikas Patel">Vikas Patel</option>
+                      <option value="Rahul Verma">Rahul Verma</option>
+                      <option value="Amit Kumar">Amit Kumar</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">
-                    Supervisor In-Charge (सुपरवाइज़र)*
-                  </label>
-                  <input
-                    type="text"
-                    id="inpSupervisor"
-                    list="supervisorDatalist"
-                    value={supervisor}
-                    onChange={(e) => setSupervisor(e.target.value)}
-                    placeholder="जैसे: Ankit Dayal"
-                    required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                  />
-                  <datalist id="supervisorDatalist">
-                    {SUPERVISOR_ROSTER.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                className="btn-submit w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2 mt-2"
-                style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: '1rem', marginTop: '8px' }}
-              >
-                <Send className="w-4 h-4" />
-                <span>Submit Gate Entry (Record In-Time)</span>
-              </button>
-            </form>
-          </div>
-        </section>
-      )}
-
-      {/* 4. ALL RECORDS TAB (History Logs & 14-Col Overview) */}
-      {activeSubTab === 'allRecords' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
-            <div>
-              <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-blue-600" />
-                <span>{lang === 'hi' ? 'सभी वाहनों की हिस्ट्री और स्टेटस लॉग्स' : 'All Vehicle Movement History Logs'}</span>
-              </h3>
-              <p className="text-xs text-slate-500">Live 14-column movement records with 3-stage timestamps</p>
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-xs transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Record Gate In</span>
+                </button>
+              </form>
             </div>
+          )}
 
-            {/* Filters & Search */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+          {/* Mobile Tab 3: Records */}
+          {mobileTab === 'records' && (
+            <div className="space-y-3">
+              <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs space-y-2">
+                <h3 className="font-bold text-slate-800 text-xs">All Vehicle Logs</h3>
                 <input
                   type="text"
-                  placeholder="Search token, vehicle, driver..."
+                  placeholder="Search vehicle..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs w-48 sm:w-60 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:outline-none"
                 />
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Dock Assigned">Dock Assigned</option>
-                <option value="In Progress">In Progress (In Dock)</option>
-                <option value="Loaded / Unloaded">Loaded / Unloaded</option>
-              </select>
+              <div className="space-y-2.5">
+                {filteredRecords.map((r) => (
+                  <div key={r.id} className="bg-white p-3 rounded-xl border border-slate-200 text-xs space-y-1 shadow-2xs">
+                    <div className="flex justify-between font-mono font-bold">
+                      <span className="text-blue-700">{r.tokenId || r.id}</span>
+                      <span className="text-slate-900">{r.vehicleNo}</span>
+                    </div>
+                    <div className="text-slate-600">{r.driverName} • {r.transporterName || 'ICRL'}</div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100 text-[11px]">
+                      <span>{r.binNo || r.gateNo || 'Dock-01'}</span>
+                      <span className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
+                        isCompletedStatus(r) ? 'bg-emerald-100 text-emerald-800' : isInDockStatus(r) ? 'bg-cyan-100 text-cyan-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {r.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                  <th className="py-3 px-3 font-bold">Token</th>
-                  <th className="py-3 px-3 font-bold">Vehicle No</th>
-                  <th className="py-3 px-3 font-bold">Driver & Mobile</th>
-                  <th className="py-3 px-3 font-bold">Activity</th>
-                  <th className="py-3 px-3 font-bold">Transporter</th>
-                  <th className="py-3 px-3 font-bold">Type</th>
-                  <th className="py-3 px-3 font-bold">Place/CFA</th>
-                  <th className="py-3 px-3 font-bold">Dock / Bay</th>
-                  <th className="py-3 px-3 font-bold">Supervisor</th>
-                  <th className="py-3 px-3 font-bold">Gate In (Time 1)</th>
-                  <th className="py-3 px-3 font-bold">In Dock (Time 2)</th>
-                  <th className="py-3 px-3 font-bold">End Time (Time 3)</th>
-                  <th className="py-3 px-3 font-bold">Status</th>
-                  <th className="py-3 px-3 font-bold text-center">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={14} className="py-8 text-center text-slate-400 text-xs">
-                      {lang === 'hi' ? 'कोई रिकॉर्ड नहीं मिला' : 'No records found matching filters'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRecords.map((r) => {
-                    const isDone = isCompletedStatus(r);
-                    const isInDock = isInDockStatus(r);
-
-                    return (
-                      <tr key={r.id} className="hover:bg-slate-50/70 transition">
-                        <td className="py-3 px-3 font-mono font-bold text-blue-700">
-                          {r.tokenId || r.id}
-                        </td>
-                        <td className="py-3 px-3 font-mono font-bold text-slate-900">
-                          {r.vehicleNo}
-                        </td>
-                        <td className="py-3 px-3">
-                          <div className="font-semibold text-slate-800">{r.driverName || 'Driver'}</div>
-                          {r.driverMobile && (
-                            <a href={`tel:${r.driverMobile}`} className="text-blue-600 font-mono text-[11px] hover:underline">
-                              {r.driverMobile}
-                            </a>
-                          )}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                            (r.activityType || r.operation) === 'Loading' ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
-                          }`}>
-                            {r.activityType || r.operation || 'Loading'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-slate-700">{r.transporterName || 'ICRL'}</td>
-                        <td className="py-3 px-3">
-                          {r.locationType ? (
-                            <span className="font-semibold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px]">
-                              {r.locationType}
-                            </span>
-                          ) : '-'}
-                        </td>
-                        <td className="py-3 px-3 text-slate-600">{r.cfaLocation || '-'}</td>
-                        <td className="py-3 px-3 font-mono font-semibold text-slate-800">{r.binNo || r.gateNo || '-'}</td>
-                        <td className="py-3 px-3 text-slate-700">{r.supervisorName || '-'}</td>
-                        <td className="py-3 px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
-                          {r.inTime || r.startTime || '-'}
-                        </td>
-                        <td className="py-3 px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
-                          {isInDock || isDone ? (r.startTime || '-') : '-'}
-                        </td>
-                        <td className="py-3 px-3 text-emerald-700 font-mono font-semibold text-[11px] whitespace-nowrap">
-                          {isDone ? (r.exitTime || 'Completed') : '-'}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${
-                            isDone
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : isInDock
-                              ? 'bg-cyan-100 text-cyan-800 border border-cyan-300'
-                              : 'bg-amber-100 text-amber-800 border border-amber-300'
-                          }`}>
-                            {isDone ? (r.status === 'Loaded' || r.status === 'Unloaded' ? r.status : 'Completed') : isInDock ? 'In Progress (In Dock)' : 'Dock Assigned'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          {!isDone && !isInDock && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenStartModal(r, (r.activityType || r.operation || 'Loading') as 'Loading' | 'Unloading')}
-                              className="bg-cyan-600 hover:bg-cyan-700 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition"
-                            >
-                              Start In-Dock
-                            </button>
-                          )}
-                          {isInDock && (
-                            <button
-                              type="button"
-                              onClick={() => handleCloseActivityClick(r)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition"
-                            >
-                              Complete
-                            </button>
-                          )}
-                          {isDone && (
-                            <span className="text-emerald-600 font-bold text-[11px]">&#10003; Done</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+          {/* Mobile Tab 4: Stats */}
+          {mobileTab === 'stats' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-center shadow-2xs">
+                <p className="text-[10px] font-bold text-slate-500 uppercase">Total</p>
+                <h3 className="text-xl font-bold text-slate-900 mt-0.5">{totalCount}</h3>
+              </div>
+              <div className="bg-white p-3.5 rounded-xl border border-amber-200 bg-amber-50/20 text-center shadow-2xs">
+                <p className="text-[10px] font-bold text-amber-700 uppercase">Assigned</p>
+                <h3 className="text-xl font-bold text-amber-900 mt-0.5">{assignedWaitingVehicles.length}</h3>
+              </div>
+              <div className="bg-white p-3.5 rounded-xl border border-cyan-200 bg-cyan-50/20 text-center shadow-2xs">
+                <p className="text-[10px] font-bold text-cyan-700 uppercase">In Dock</p>
+                <h3 className="text-xl font-bold text-cyan-900 mt-0.5">{inProgressInDockVehicles.length}</h3>
+              </div>
+              <div className="bg-white p-3.5 rounded-xl border border-emerald-200 bg-emerald-50/20 text-center shadow-2xs">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase">Completed</p>
+                <h3 className="text-xl font-bold text-emerald-900 mt-0.5">{completedVehicles.length}</h3>
+              </div>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* SUPERVISOR START IN-DOCK MODAL */}
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="mobile-bottom-nav fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around py-2 z-40 shadow-lg">
+          <button
+            type="button"
+            onClick={() => setMobileTab('supervisor')}
+            className={`b-nav-item flex flex-col items-center gap-1 text-[10px] cursor-pointer ${
+              mobileTab === 'supervisor' ? 'text-blue-600 font-bold' : 'text-slate-500'
+            }`}
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Tasks</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('gateEntry')}
+            className={`b-nav-item flex flex-col items-center gap-1 text-[10px] cursor-pointer ${
+              mobileTab === 'gateEntry' ? 'text-blue-600 font-bold' : 'text-slate-500'
+            }`}
+          >
+            <Shield className="w-4 h-4" />
+            <span>Gate In</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('records')}
+            className={`b-nav-item flex flex-col items-center gap-1 text-[10px] cursor-pointer ${
+              mobileTab === 'records' ? 'text-blue-600 font-bold' : 'text-slate-500'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" />
+            <span>Reports</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('stats')}
+            className={`b-nav-item flex flex-col items-center gap-1 text-[10px] cursor-pointer ${
+              mobileTab === 'stats' ? 'text-blue-600 font-bold' : 'text-slate-500'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Stats</span>
+          </button>
+        </nav>
+      </div>
+
+      {/* Start Modal */}
       {selectedTokenToStart && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
