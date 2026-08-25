@@ -65,11 +65,15 @@ export interface DockRecord {
   tokenId?: string;
   unit: CompanyUnit;
   gateNo: string;
+  binNo?: string;
   operation: DockOperation;
   vehicleType?: VehicleType;
   transporterName?: TransporterName;
   vehicleNo: string;
   driverName?: string;
+  driverMobile?: string;
+  locationType?: 'LL' | 'TP' | string;
+  cfaLocation?: string;
   sealNo?: string;
   invoiceNo?: string;
   lrNo?: string;

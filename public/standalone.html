@@ -1,1397 +1,553 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AHPL & AIL - Warehouse Dock, Transport & POD Management Hub</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js CDN -->
+  <title>Warehouse Vehicle Movement Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Lucide Icons CDN -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- SheetJS for Excel (.xlsx) -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- jsPDF & AutoTable for PDF (.pdf) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @media print {
-      body * { visibility: hidden; }
-      #printablePass, #printablePass * { visibility: visible; }
-      #printablePass { position: absolute; left: 0; top: 0; width: 100%; }
-    }
-  </style>
-</head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col antialiased">
-
-  <!-- Top Header -->
-  <header class="bg-slate-900 text-white px-4 sm:px-6 py-3.5 shadow-md sticky top-0 z-50 border-b border-slate-800">
-    <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
-      <div class="flex items-center gap-3">
-        <div class="p-2.5 bg-indigo-600 rounded-xl shadow-inner flex items-center justify-center text-white">
-          <i data-lucide="truck" class="w-6 h-6"></i>
-        </div>
-        <div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <h1 class="text-lg sm:text-xl font-bold tracking-wide text-white">
-              AHPL & AIL
-            </h1>
-            <span class="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md border border-indigo-400/30 font-medium">
-              Dock Operations
-            </span>
-          </div>
-          <p class="text-xs text-slate-400 font-medium">
-            AHPL: Docks 1–4 | AIL: Docks 5–9 | Dispatch & POD Audit Control
-          </p>
-        </div>
-      </div>
-      
-      <div class="flex items-center flex-wrap gap-2.5 sm:gap-4 text-sm">
-        <!-- Stock Overview Button -->
-        <button type="button" onclick="openStockModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-medium border border-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-xs">
-          <i data-lucide="package-check" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span class="hidden sm:inline">Stock / Inventory</span>
-          <span class="sm:hidden">Stock</span>
-        </button>
-
-        <!-- Live Systems Active Pill -->
-        <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-3 py-1 rounded-full flex items-center gap-1.5 text-xs font-medium">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Live Active</span>
-        </span>
-
-        <!-- Live Clock & Date -->
-        <div class="text-right hidden sm:block">
-          <div id="liveClock" class="text-slate-200 font-mono text-xs font-semibold tracking-wider"></div>
-          <div id="liveDate" class="text-[11px] text-slate-400 font-sans"></div>
-        </div>
-      </div>
-    </div>
-  </header>
-
-  <!-- Navigation Menu Bar -->
-  <nav class="bg-white border-b border-slate-200 sticky top-[69px] z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex gap-2 overflow-x-auto py-2">
-      <button onclick="switchTab('loadingTab', this)" class="nav-tab active-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200">
-        <i data-lucide="truck" class="w-4 h-4"></i> Loading & Transport Log
-      </button>
-
-      <button onclick="switchTab('liveTab', this)" class="nav-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent">
-        <i data-lucide="activity" class="w-4 h-4"></i> Live Activity & Docks
-      </button>
-
-      <button onclick="switchTab('reportsTab', this)" class="nav-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent">
-        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Reports, HTML & Export
-      </button>
-
-      <button onclick="switchTab('analyticsTab', this)" class="nav-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent">
-        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Analytics & Graphs
-      </button>
-    </div>
-  </nav>
-
-  <!-- Main Container -->
-  <main class="max-w-7xl mx-auto p-4 sm:p-6 flex-1 w-full space-y-6">
-
-    <!-- ==================== TAB 1: LOADING & TRANSPORT LOG ==================== -->
-    <section id="loadingTab" class="tab-content space-y-6">
-      
-      <!-- KPI Summary Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">AHPL Docks (1–4)</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1" id="kpiAhplDocks">2 / 4 Active</h3>
-            <span class="text-xs text-indigo-600 font-medium" id="kpiAhplOcc">50% Occupancy</span>
-          </div>
-          <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="door-open" class="w-6 h-6"></i></div>
-        </div>
-
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">AIL Docks (5–9)</p>
-            <h3 class="text-2xl font-bold text-slate-800 mt-1" id="kpiAilDocks">3 / 5 Active</h3>
-            <span class="text-xs text-blue-600 font-medium" id="kpiAilOcc">60% Occupancy</span>
-          </div>
-          <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="door-open" class="w-6 h-6"></i></div>
-        </div>
-
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">POD Clean Rate</p>
-            <h3 class="text-2xl font-bold text-emerald-600 mt-1" id="kpiPodCleanRate">100%</h3>
-            <span class="text-xs text-slate-500">No Incidence Clear Dispatches</span>
-          </div>
-          <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="shield-check" class="w-6 h-6"></i></div>
-        </div>
-
-        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div>
-            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">POD Hold / Shortage</p>
-            <h3 class="text-2xl font-bold text-rose-600 mt-1" id="kpiPodHoldCount">0 Cases</h3>
-            <span class="text-xs text-rose-500 font-medium">Damage / Unloaded Pending</span>
-          </div>
-          <div class="p-3 bg-rose-50 text-rose-600 rounded-lg"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
-        </div>
-      </div>
-
-      <!-- Dock Entry Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Assignment Form -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-1">
-          <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i> New Vehicle & POD Entry
-          </h2>
-          
-          <form id="dockForm" onsubmit="handleFormSubmit(event)" class="space-y-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Company / Operating Unit</label>
-              <select id="companyUnit" onchange="updateDockOptions()" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium text-slate-800">
-                <option value="AHPL">AHPL (Docks 1 to 4)</option>
-                <option value="AIL">AIL (Docks 5 to 9)</option>
-                <option value="AHPL & AIL">Joint AHPL & AIL</option>
-              </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Assigned Dock</label>
-                <select id="dockNo" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium">
-                  <!-- Populated dynamically via JS -->
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Operation</label>
-                <select id="opType" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium">
-                  <option value="Loading">Loading</option>
-                  <option value="Unloading">Unloading</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Vehicle Type</label>
-              <select id="vehicleType" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium">
-                <option value="32 Ft Single Axle (SXL)">32 Ft Single Axle (SXL)</option>
-                <option value="32 Ft Multi Axle (MXL)">32 Ft Multi Axle (MXL)</option>
-                <option value="32 Ft 15 MT">32 Ft 15 MT</option>
-                <option value="32 Ft 18 MT">32 Ft 18 MT</option>
-                <option value="24 Ft 9 MT">24 Ft 9 MT</option>
-                <option value="PTL">PTL (Part Truck Load)</option>
-                <option value="Local">Local</option>
-              </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Transporter</label>
-                <select id="transporterName" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium text-slate-800">
-                  <option value="ICRL">ICRL</option>
-                  <option value="MATA">MATA</option>
-                  <option value="OPM">OPM</option>
-                  <option value="DHTC">DHTC</option>
-                  <option value="MCM">MCM</option>
-                  <option value="FLY GREEN">FLY GREEN</option>
-                  <option value="VARUNA">VARUNA</option>
-                  <option value="JEET">JEET</option>
-                  <option value="OTHER">OTHER</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Supervisor</label>
-                <select id="supervisorName" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-medium text-slate-800">
-                  <option value="Suman Singh">Suman Singh</option>
-                  <option value="Anup Pal">Anup Pal</option>
-                  <option value="Kishore Sarlam">Kishore Sarlam</option>
-                  <option value="R.K. Mishra">R.K. Mishra</option>
-                  <option value="Sandeep Borkar">Sandeep Borkar</option>
-                  <option value="Ankit Dayal">Ankit Dayal</option>
-                  <option value="Varun Swami">Varun Swami</option>
-                  <option value="Kanhaiya Patel">Kanhaiya Patel</option>
-                  <option value="Deepesh Sethi">Deepesh Sethi</option>
-                  <option value="Rahul Prajapati">Rahul Prajapati</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Vehicle Number</label>
-                <input type="text" id="vehicleNo" placeholder="MP-09-AB-1234" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-semibold">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Vehicle Seal No.</label>
-                <input type="text" id="sealNo" placeholder="SL-987654" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none font-mono">
-              </div>
-            </div>
-
-            <!-- Documents -->
-            <div class="grid grid-cols-2 gap-3 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Invoice Number</label>
-                <input type="text" id="invoiceNo" placeholder="INV-2026-001" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-mono">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">LR Number</label>
-                <input type="text" id="lrNo" placeholder="LR-554433" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase font-mono">
-              </div>
-            </div>
-
-            <!-- POD Status Dropdown -->
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">POD Status / Incidence Category</label>
-              <select id="podStatus" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white font-semibold">
-                <option value="POD Clean" class="text-emerald-600">✔ POD Clean (No Incidence)</option>
-                <option value="POD Hold - Damage" class="text-rose-600">⚠ POD Hold - Material Damage</option>
-                <option value="POD Hold - Insurance Claim" class="text-amber-600">⚠ POD Hold - Insurance Claim</option>
-                <option value="POD Hold - Goods Not Unloaded / Shortage" class="text-orange-600">⚠ POD Hold - Goods Not Unloaded / Shortage</option>
-                <option value="POD Hold - Goods Not Received" class="text-red-700">⚠ POD Hold - Goods Not Received (माल नहीं आया)</option>
-                <option value="POD Hold - Shortage" class="text-amber-600">⚠ POD Hold - Shortage / Leakage</option>
-              </select>
-            </div>
-
-            <!-- File Upload Option -->
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Upload Document / Proof</label>
-              <input type="file" id="docUpload" accept="image/*,.pdf" class="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-200 rounded-lg bg-white p-1">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <div class="flex justify-between items-center mb-1">
-                  <label class="text-xs font-semibold text-slate-600">Start Time</label>
-                  <button type="button" onclick="setNow('startTime')" class="text-[11px] text-indigo-600 hover:underline">Now</button>
-                </div>
-                <input type="time" id="startTime" required class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-              </div>
-              <div>
-                <div class="flex justify-between items-center mb-1">
-                  <label class="text-xs font-semibold text-slate-600">Exit Time</label>
-                  <button type="button" onclick="setNow('exitTime')" class="text-[11px] text-indigo-600 hover:underline">Now</button>
-                </div>
-                <input type="time" id="exitTime" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Dock Status</label>
-              <select id="status" class="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-                <option value="In-Progress">In-Progress (In Dock)</option>
-                <option value="Completed">Completed (Exited)</option>
-                <option value="Waiting">Waiting for Dock</option>
-              </select>
-            </div>
-
-            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm cursor-pointer">
-              Save Entry
-            </button>
-          </form>
-        </div>
-
-        <!-- Live Movement Table -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm lg:col-span-2 flex flex-col justify-between">
-          <div>
-            <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
-              <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-                <i data-lucide="list" class="w-5 h-5 text-indigo-600"></i> Dock, Transport & POD Log
-              </h2>
-              <div class="flex items-center gap-2">
-                <input type="text" id="tableSearch" oninput="renderTable()" placeholder="Search vehicle / doc..." class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1.5 rounded-md font-mono" id="rowCount">0 Records</span>
-              </div>
-            </div>
-
-            <div class="overflow-x-auto border border-slate-100 rounded-lg">
-              <table class="w-full text-left text-sm whitespace-nowrap">
-                <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
-                  <tr>
-                    <th class="py-3 px-3">Unit / Dock</th>
-                    <th class="py-3 px-3">Vehicle Details</th>
-                    <th class="py-3 px-3">Docs (Inv / LR)</th>
-                    <th class="py-3 px-3">Seal No</th>
-                    <th class="py-3 px-3">POD Status</th>
-                    <th class="py-3 px-3">Transporter</th>
-                    <th class="py-3 px-3">Supervisor</th>
-                    <th class="py-3 px-3">Timing</th>
-                    <th class="py-3 px-3">Status</th>
-                    <th class="py-3 px-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="dockTable" class="divide-y divide-slate-100">
-                  <!-- Populated dynamically via JS -->
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 2: LIVE ACTIVITY ==================== -->
-    <section id="liveTab" class="tab-content hidden space-y-6">
-      <!-- AHPL Docks (1-4) -->
-      <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-          <h2 class="text-base font-bold text-indigo-700 flex items-center gap-2">
-            <i data-lucide="layout-grid" class="w-5 h-5"></i> AHPL Dedicated Bays (Docks 1 – 4)
-          </h2>
-          <span class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded">AHPL Wing</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4" id="ahplBayGrid">
-          <!-- Populated via JS -->
-        </div>
-      </div>
-
-      <!-- AIL Docks (5-9) -->
-      <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-          <h2 class="text-base font-bold text-blue-700 flex items-center gap-2">
-            <i data-lucide="layout-grid" class="w-5 h-5"></i> AIL Dedicated Bays (Docks 5 – 9)
-          </h2>
-          <span class="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded">AIL Wing</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4" id="ailBayGrid">
-          <!-- Populated via JS -->
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 3: REPORTS, HTML & EXPORT ==================== -->
-    <section id="reportsTab" class="tab-content hidden space-y-6">
-      <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-          <div>
-            <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-indigo-600"></i> Reports, HTML & Data Export Hub
-            </h2>
-            <p class="text-xs text-slate-500 mt-0.5">
-              AHPL (Docks 1-4) & AIL (Docks 5-9) | Direct Excel, PDF, CSV & Embedded HTML Table
-            </p>
-          </div>
-
-          <!-- Export Action Buttons -->
-          <div class="flex flex-wrap items-center gap-2">
-            <button type="button" onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Export Excel (.xlsx)
-            </button>
-
-            <button type="button" onclick="exportToPDF()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer">
-              <i data-lucide="file-text" class="w-4 h-4"></i> Export PDF (.pdf)
-            </button>
-
-            <button type="button" onclick="downloadHTMLReport()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer">
-              <i data-lucide="code-2" class="w-4 h-4"></i> Download HTML
-            </button>
-
-            <button type="button" onclick="copyHTMLTable()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer" id="copyHtmlBtn">
-              <i data-lucide="copy" class="w-4 h-4"></i> Copy HTML Table
-            </button>
-
-            <button type="button" onclick="exportCSV()" class="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer">
-              <i data-lucide="download" class="w-4 h-4"></i> CSV
-            </button>
-          </div>
-        </div>
-
-        <!-- Filter Controls -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Date From</label>
-            <input type="date" id="filterDateFrom" onchange="renderReportsTable()" class="w-full border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Date To</label>
-            <input type="date" id="filterDateTo" onchange="renderReportsTable()" class="w-full border border-slate-300 rounded-lg p-1.5 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Unit</label>
-            <select id="filterUnit" onchange="renderReportsTable()" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option value="ALL">All (AHPL & AIL)</option>
-              <option value="AHPL">AHPL (Docks 1-4)</option>
-              <option value="AIL">AIL (Docks 5-9)</option>
-              <option value="AHPL & AIL">Joint AHPL & AIL</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">Supervisor</label>
-            <select id="filterSupervisor" onchange="renderReportsTable()" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option value="ALL">All Supervisors</option>
-              <option value="Suman Singh">Suman Singh</option>
-              <option value="Anup Pal">Anup Pal</option>
-              <option value="Kishore Sarlam">Kishore Sarlam</option>
-              <option value="R.K. Mishra">R.K. Mishra</option>
-              <option value="Sandeep Borkar">Sandeep Borkar</option>
-              <option value="Ankit Dayal">Ankit Dayal</option>
-              <option value="Varun Swami">Varun Swami</option>
-              <option value="Kanhaiya Patel">Kanhaiya Patel</option>
-              <option value="Deepesh Sethi">Deepesh Sethi</option>
-              <option value="Rahul Prajapati">Rahul Prajapati</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1">POD Status</label>
-            <select id="filterPod" onchange="renderReportsTable()" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-              <option value="ALL">All PODs</option>
-              <option value="Clean">✔ Clean Only</option>
-              <option value="Hold">⚠ Holds / Claims</option>
-            </select>
-          </div>
-          <div class="flex items-end">
-            <button type="button" onclick="resetReportFilters()" class="w-full p-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition cursor-pointer flex items-center justify-center gap-1">
-              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset
-            </button>
-          </div>
-        </div>
-
-        <!-- Reports Table -->
-        <div class="overflow-x-auto border border-slate-200 rounded-xl">
-          <table class="w-full text-left text-sm whitespace-nowrap" id="reportsMainTable">
-            <thead class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
-              <tr>
-                <th class="py-3 px-3">Date & ID</th>
-                <th class="py-3 px-3">Unit</th>
-                <th class="py-3 px-3">Dock</th>
-                <th class="py-3 px-3">Operation</th>
-                <th class="py-3 px-3">Vehicle / Seal</th>
-                <th class="py-3 px-3">Docs (Inv / LR)</th>
-                <th class="py-3 px-3">POD Status</th>
-                <th class="py-3 px-3">Transporter</th>
-                <th class="py-3 px-3">Supervisor</th>
-                <th class="py-3 px-3">Timing / TAT</th>
-                <th class="py-3 px-3">Status</th>
-              </tr>
-            </thead>
-            <tbody id="reportsTableBody" class="divide-y divide-slate-100">
-              <!-- Populated via JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TAB 4: ANALYTICS & GRAPHS ==================== -->
-    <section id="analyticsTab" class="tab-content hidden space-y-6">
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Average TAT Chart -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="clock" class="w-4 h-4 text-indigo-600"></i> Turnaround Time (TAT) by Dock Bay
-            </h3>
-            <span class="text-xs text-slate-500 font-mono">Target: &lt; 90 mins</span>
-          </div>
-          <div class="h-64 relative">
-            <canvas id="tatChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Hourly Throughput Chart -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="trending-up" class="w-4 h-4 text-indigo-600"></i> Hourly Dock Throughput
-            </h3>
-            <span class="text-xs text-slate-500">Loading vs Unloading</span>
-          </div>
-          <div class="h-64 relative">
-            <canvas id="throughputChart"></canvas>
-          </div>
-        </div>
-
-        <!-- POD Incidence Share -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="shield-check" class="w-4 h-4 text-indigo-600"></i> POD Audit & Incident Breakdown
-            </h3>
-            <span class="text-xs text-emerald-600 font-semibold" id="analyticsPodCleanRate">--% Clean</span>
-          </div>
-          <div class="h-64 relative">
-            <canvas id="podChart"></canvas>
-          </div>
-        </div>
-
-        <!-- Transporter Volume Share -->
-        <div class="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-sm">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <i data-lucide="truck" class="w-4 h-4 text-indigo-600"></i> Transporter Volume Fleet Share
-            </h3>
-            <span class="text-xs text-slate-500">ICRL, MATA, OPM & Partners</span>
-          </div>
-          <div class="h-64 relative">
-            <canvas id="transporterChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Stock Modal -->
-  <div id="stockModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-        <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-          <i data-lucide="package-check" class="w-5 h-5 text-indigo-600"></i> AHPL & AIL Warehouse Stock Summary
-        </h3>
-        <button onclick="closeStockModal()" class="text-slate-400 hover:text-slate-700"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-        <div class="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-          <p class="text-xs text-indigo-600 font-semibold uppercase">AHPL Pallets</p>
-          <p class="text-2xl font-bold text-slate-900 mt-1">1,420</p>
-        </div>
-        <div class="p-3 bg-blue-50 rounded-xl border border-blue-100">
-          <p class="text-xs text-blue-600 font-semibold uppercase">AIL Pallets</p>
-          <p class="text-2xl font-bold text-slate-900 mt-1">2,180</p>
-        </div>
-        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-          <p class="text-xs text-emerald-600 font-semibold uppercase">Ready Outbound</p>
-          <p class="text-2xl font-bold text-emerald-700 mt-1">320</p>
-        </div>
-        <div class="p-3 bg-rose-50 rounded-xl border border-rose-100">
-          <p class="text-xs text-rose-600 font-semibold uppercase">Hold Quarantine</p>
-          <p class="text-2xl font-bold text-rose-700 mt-1">14</p>
-        </div>
-      </div>
-      <div class="text-right pt-2">
-        <button onclick="closeStockModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Gate Pass Modal (Printable) -->
-  <div id="gatePassModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4" id="printablePass">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
-        <div>
-          <h3 class="font-bold text-slate-900 text-lg">AHPL & AIL LOGISTICS</h3>
-          <p class="text-xs text-slate-500">Official Dock Outward Gate Pass / POD Clearance</p>
-        </div>
-        <button onclick="closeGatePassModal()" class="text-slate-400 hover:text-slate-700 print:hidden"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-
-      <div class="space-y-3 text-xs" id="gatePassContent">
-        <!-- Populated dynamically -->
-      </div>
-
-      <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 print:hidden">
-        <button onclick="window.print()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
-          <i data-lucide="printer" class="w-4 h-4"></i> Print Pass
-        </button>
-        <button onclick="closeGatePassModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- JavaScript Application Engine -->
-  <script>
-    // Initial Pre-loaded Data
-    const INITIAL_RECORDS = [
-      {
-        id: 'DOCK-2026-001',
-        date: '2026-08-25',
-        unit: 'AHPL',
-        gateNo: 'Dock 1 (AHPL)',
-        operation: 'Loading',
-        vehicleNo: 'MP-09-GF-1122',
-        vehicleType: '32 Ft Single Axle (SXL)',
-        transporterName: 'ICRL',
-        supervisorName: 'Suman Singh',
-        sealNo: 'SL-443321',
-        invoiceNo: 'INV-88901',
-        lrNo: 'LR-11029',
-        podStatus: 'POD Clean',
-        startTime: '09:30',
-        exitTime: '11:00',
-        status: 'Completed',
-        remarks: 'Direct dispatch completed with clear verification.'
-      },
-      {
-        id: 'DOCK-2026-002',
-        date: '2026-08-25',
-        unit: 'AHPL',
-        gateNo: 'Dock 3 (AHPL)',
-        operation: 'Loading',
-        vehicleNo: 'MH-12-PQ-8877',
-        vehicleType: '32 Ft Multi Axle (MXL)',
-        transporterName: 'MATA',
-        supervisorName: 'Kishore Sarlam',
-        sealNo: 'SL-998822',
-        invoiceNo: 'INV-88902',
-        lrNo: 'LR-11030',
-        podStatus: 'POD Clean',
-        startTime: '10:15',
-        exitTime: '',
-        status: 'In-Progress',
-        remarks: 'Loading palletized batch.'
-      },
-      {
-        id: 'DOCK-2026-003',
-        date: '2026-08-25',
-        unit: 'AIL',
-        gateNo: 'Dock 5 (AIL)',
-        operation: 'Unloading',
-        vehicleNo: 'GJ-06-ZZ-4321',
-        vehicleType: '32 Ft 15 MT',
-        transporterName: 'OPM',
-        supervisorName: 'Anup Pal',
-        sealNo: 'SL-776611',
-        invoiceNo: 'INV-88903',
-        lrNo: 'LR-11031',
-        podStatus: 'POD Hold - Damage',
-        startTime: '08:45',
-        exitTime: '10:30',
-        status: 'Completed',
-        remarks: 'Damage observed on bottom 3 cartons; POD kept on hold.'
-      },
-      {
-        id: 'DOCK-2026-004',
-        date: '2026-08-25',
-        unit: 'AIL',
-        gateNo: 'Dock 7 (AIL)',
-        operation: 'Loading',
-        vehicleNo: 'HR-55-XY-9081',
-        vehicleType: '32 Ft Single Axle (SXL)',
-        transporterName: 'DHTC',
-        supervisorName: 'R.K. Mishra',
-        sealNo: 'SL-554411',
-        invoiceNo: 'INV-88904',
-        lrNo: 'LR-11032',
-        podStatus: 'POD Clean',
-        startTime: '11:00',
-        exitTime: '',
-        status: 'In-Progress',
-        remarks: 'Outward staging active.'
-      },
-      {
-        id: 'DOCK-2026-005',
-        date: '2026-08-25',
-        unit: 'AIL',
-        gateNo: 'Dock 8 (AIL)',
-        operation: 'Unloading',
-        vehicleNo: 'DL-01-AB-3344',
-        vehicleType: '24 Ft 9 MT',
-        transporterName: 'VARUNA',
-        supervisorName: 'Sandeep Borkar',
-        sealNo: 'SL-332211',
-        invoiceNo: 'INV-88905',
-        lrNo: 'LR-11033',
-        podStatus: 'POD Clean',
-        startTime: '11:30',
-        exitTime: '',
-        status: 'In-Progress',
-        remarks: 'Inward verification.'
-      },
-      {
-        id: 'DOCK-2026-006',
-        date: '2026-08-25',
-        unit: 'AHPL & AIL',
-        gateNo: 'Dock 4 (AHPL)',
-        operation: 'Loading',
-        vehicleNo: 'RJ-14-GH-6655',
-        vehicleType: '32 Ft 18 MT',
-        transporterName: 'MCM',
-        supervisorName: 'Ankit Dayal',
-        sealNo: 'SL-221144',
-        invoiceNo: 'INV-88906',
-        lrNo: 'LR-11034',
-        podStatus: 'POD Hold - Insurance Claim',
-        startTime: '09:00',
-        exitTime: '10:45',
-        status: 'Completed',
-        remarks: 'Claim initiated for in-transit moisture defect.'
-      }
-    ];
-
-    // State Management (with LocalStorage)
-    let records = JSON.parse(localStorage.getItem('ahpl_ail_dock_records') || 'null');
-    if (!records || records.length === 0) {
-      records = [...INITIAL_RECORDS];
-      localStorage.setItem('ahpl_ail_dock_records', JSON.stringify(records));
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #3b82f6;
+      --sidebar-bg: #0f172a;
+      --sidebar-hover: #1e293b;
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --info: #06b6d4;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
     }
 
-    function saveRecords() {
-      localStorage.setItem('ahpl_ail_dock_records', JSON.stringify(records));
-      updateKPIs();
-      renderTable();
-      renderBays();
-      renderReportsTable();
-      updateCharts();
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { display: flex; background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
 
-    // Tab Navigation
-    function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-      const target = document.getElementById(tabId);
-      if (target) target.classList.remove('hidden');
+    /* Sidebar Navigation */
+    .sidebar { width: 260px; background-color: var(--sidebar-bg); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; z-index: 100; }
+    .sidebar-brand { padding: 22px 20px; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); color: #60a5fa; }
+    .sidebar-menu { list-style: none; padding: 15px 10px; flex: 1; }
+    .sidebar-menu li { margin-bottom: 6px; }
+    .nav-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: none; background: transparent; color: #94a3b8; font-size: 0.95rem; font-weight: 500; border-radius: 8px; cursor: pointer; text-align: left; transition: all 0.2s; }
+    .nav-btn:hover { background-color: var(--sidebar-hover); color: #fff; }
+    .nav-btn.active { background-color: var(--primary-light); color: #fff; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
 
-      document.querySelectorAll('.nav-tab').forEach(b => {
-        b.className = 'nav-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-transparent';
-      });
+    /* Main Container */
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow-y: auto; height: 100vh; }
+    .top-header { background: #ffffff; padding: 16px 28px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 90; }
+    .top-header h1 { font-size: 1.3rem; font-weight: 700; }
+    .btn-refresh { background: #f8fafc; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .content-body { padding: 24px 28px; flex: 1; }
+    .tab-section { display: none; }
+    .tab-section.active { display: block; animation: fadeIn 0.25s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-      if (btn) {
-        btn.className = 'nav-tab active-tab flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition text-indigo-600 bg-indigo-50 border border-indigo-200';
-      }
+    /* KPI Summary Cards */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 24px; }
+    .kpi-card { background: var(--card-bg); padding: 18px; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .kpi-info p { font-size: 0.82rem; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; text-transform: uppercase; }
+    .kpi-info h2 { font-size: 1.7rem; font-weight: 700; }
+    .kpi-icon { width: 48px; height: 48px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; }
+    .icon-total { background: #eff6ff; color: var(--primary-light); }
+    .icon-waiting { background: #fef3c7; color: var(--warning); }
+    .icon-loading { background: #ecfeff; color: var(--info); }
+    .icon-unloading { background: #f5f3ff; color: var(--purple); }
+    .icon-completed { background: #d1fae5; color: var(--success); }
 
-      if (tabId === 'analyticsTab') {
-        setTimeout(updateCharts, 100);
-      }
-      lucide.createIcons();
-    }
+    /* Kanban Task Board */
+    .kanban-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+    .kanban-column { background: #e2e8f0; border-radius: 10px; padding: 14px; min-height: 480px; display: flex; flex-direction: column; }
+    .column-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 2px solid rgba(0,0,0,0.06); font-weight: 700; font-size: 0.95rem; }
+    .badge-count { background: #cbd5e1; color: #334155; font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; }
+    .kanban-cards { display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; }
+    .task-card { background: #ffffff; border-radius: 8px; padding: 14px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px; }
+    .card-top { display: flex; justify-content: space-between; align-items: center; }
+    .token-tag { font-size: 0.75rem; font-weight: 700; color: var(--primary-light); background: #eff6ff; padding: 2px 6px; border-radius: 4px; }
+    .vehicle-num { font-size: 1.05rem; font-weight: 700; color: #0f172a; }
+    .card-meta { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; }
+    .location-tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+    .card-actions { margin-top: 6px; display: flex; gap: 6px; }
+    .btn-act { flex: 1; padding: 6px 8px; border: none; border-radius: 4px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+    .btn-loading { background: var(--info); color: #fff; }
+    .btn-unloading { background: var(--purple); color: #fff; }
+    .btn-finish { background: var(--success); color: #fff; }
 
-    // Dynamic Dock Options based on Operating Unit
-    function updateDockOptions() {
-      const unit = document.getElementById('companyUnit').value;
-      const dockSelect = document.getElementById('dockNo');
-      dockSelect.innerHTML = '';
+    /* Dashboard Charts */
+    .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+    .chart-card { background: var(--card-bg); border-radius: 10px; padding: 20px; border: 1px solid var(--border-color); }
+    .chart-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .chart-container { position: relative; height: 260px; width: 100%; }
 
-      let options = [];
-      if (unit === 'AHPL') {
-        options = ['Dock 1 (AHPL)', 'Dock 2 (AHPL)', 'Dock 3 (AHPL)', 'Dock 4 (AHPL)'];
-      } else if (unit === 'AIL') {
-        options = ['Dock 5 (AIL)', 'Dock 6 (AIL)', 'Dock 7 (AIL)', 'Dock 8 (AIL)', 'Dock 9 (AIL)'];
-      } else {
-        options = [
-          'Dock 1 (AHPL)', 'Dock 2 (AHPL)', 'Dock 3 (AHPL)', 'Dock 4 (AHPL)',
-          'Dock 5 (AIL)', 'Dock 6 (AIL)', 'Dock 7 (AIL)', 'Dock 8 (AIL)', 'Dock 9 (AIL)'
-        ];
-      }
+    /* Forms and Table */
+    .panel-card { background: var(--card-bg); border-radius: 10px; padding: 22px; border: 1px solid var(--border-color); margin-bottom: 20px; }
+    .panel-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+    .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.84rem; font-weight: 600; color: #475569; }
+    .form-group input, .form-group select { padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; }
+    .btn-submit { background: var(--primary-light); color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--border-color); font-size: 0.85rem; }
+    th { background: #f8fafc; color: #475569; font-weight: 700; }
+    .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.74rem; font-weight: 700; }
+    .st-waiting { background: #fef3c7; color: #92400e; }
+    .st-loading { background: #ecfeff; color: #155e75; }
+    .st-unloading { background: #f5f3ff; color: #5b21b6; }
+    .st-completed { background: #d1fae5; color: #065f46; }
 
-      options.forEach(opt => {
-        const el = document.createElement('option');
-        el.value = opt;
-        el.textContent = opt;
-        dockSelect.appendChild(el);
-      });
-    }
-
-    function setNow(inputId) {
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      document.getElementById(inputId).value = `${hh}:${mm}`;
-    }
-
-    // Form Submission Handler
-    function handleFormSubmit(e) {
-      e.preventDefault();
-      const newRec = {
-        id: `DOCK-2026-${String(records.length + 1).padStart(3, '0')}`,
-        date: new Date().toISOString().slice(0, 10),
-        unit: document.getElementById('companyUnit').value,
-        gateNo: document.getElementById('dockNo').value,
-        operation: document.getElementById('opType').value,
-        vehicleNo: document.getElementById('vehicleNo').value.toUpperCase().trim(),
-        vehicleType: document.getElementById('vehicleType').value,
-        transporterName: document.getElementById('transporterName').value,
-        supervisorName: document.getElementById('supervisorName').value,
-        sealNo: document.getElementById('sealNo').value.trim() || 'SL-' + Math.floor(100000 + Math.random() * 900000),
-        invoiceNo: document.getElementById('invoiceNo').value.toUpperCase().trim() || '',
-        lrNo: document.getElementById('lrNo').value.toUpperCase().trim() || '',
-        podStatus: document.getElementById('podStatus').value,
-        startTime: document.getElementById('startTime').value || '09:00',
-        exitTime: document.getElementById('exitTime').value || '',
-        status: document.getElementById('status').value,
-        remarks: 'New entry created.'
-      };
-
-      records.unshift(newRec);
-      saveRecords();
-      document.getElementById('dockForm').reset();
-      updateDockOptions();
-      alert('Dock Record Created Successfully!');
-    }
-
-    // Delete Record
-    function deleteRecord(id) {
-      if (confirm(`Are you sure you want to delete record ${id}?`)) {
-        records = records.filter(r => r.id !== id);
-        saveRecords();
-      }
-    }
-
-    // Quick Exit Dock from Bay View
-    function quickExitDock(id) {
-      const rec = records.find(r => r.id === id);
-      if (rec) {
-        const now = new Date();
-        const hh = String(now.getHours()).padStart(2, '0');
-        const mm = String(now.getMinutes()).padStart(2, '0');
-        rec.exitTime = `${hh}:${mm}`;
-        rec.status = 'Completed';
-        saveRecords();
-      }
-    }
-
-    // Update KPI Counters
-    function updateKPIs() {
-      const ahplActive = records.filter(r => r.unit === 'AHPL' && r.status === 'In-Progress').length;
-      const ailActive = records.filter(r => r.unit === 'AIL' && r.status === 'In-Progress').length;
-      const cleanCount = records.filter(r => !r.podStatus || r.podStatus === 'POD Clean').length;
-      const holdCount = records.length - cleanCount;
-      const cleanRate = records.length > 0 ? Math.round((cleanCount / records.length) * 100) : 100;
-
-      document.getElementById('kpiAhplDocks').textContent = `${ahplActive} / 4 Active`;
-      document.getElementById('kpiAhplOcc').textContent = `${Math.round((ahplActive / 4) * 100)}% Occupancy`;
-
-      document.getElementById('kpiAilDocks').textContent = `${ailActive} / 5 Active`;
-      document.getElementById('kpiAilOcc').textContent = `${Math.round((ailActive / 5) * 100)}% Occupancy`;
-
-      document.getElementById('kpiPodCleanRate').textContent = `${cleanRate}%`;
-      document.getElementById('kpiPodHoldCount').textContent = `${holdCount} Cases`;
-      const pcr = document.getElementById('analyticsPodCleanRate');
-      if (pcr) pcr.textContent = `${cleanRate}% Clean`;
-    }
-
-    // Helper: POD Badge HTML
-    function getPodBadgeHtml(podStatus) {
-      if (!podStatus || podStatus === 'POD Clean') {
-        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">✔ Clean</span>';
-      }
-      return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">⚠ ${podStatus.replace('POD Hold - ', '')}</span>`;
-    }
-
-    // Render Live Movement Table
-    function renderTable() {
-      const query = (document.getElementById('tableSearch')?.value || '').toLowerCase();
-      const tbody = document.getElementById('dockTable');
-      tbody.innerHTML = '';
-
-      const filtered = records.filter(r => {
-        if (!query) return true;
-        return r.vehicleNo.toLowerCase().includes(query) ||
-               r.gateNo.toLowerCase().includes(query) ||
-               (r.invoiceNo && r.invoiceNo.toLowerCase().includes(query)) ||
-               (r.sealNo && r.sealNo.toLowerCase().includes(query)) ||
-               r.supervisorName.toLowerCase().includes(query);
-      });
-
-      document.getElementById('rowCount').textContent = `${filtered.length} Records`;
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="10" class="py-6 text-center text-slate-400 text-xs">No records found</td></tr>';
-        return;
-      }
-
-      filtered.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition';
-        tr.innerHTML = `
-          <td class="py-3 px-3">
-            <span class="font-bold text-xs ${r.unit === 'AHPL' ? 'text-indigo-700' : 'text-blue-700'}">${r.unit}</span>
-            <span class="block text-[11px] text-slate-500 font-medium">${r.gateNo}</span>
-          </td>
-          <td class="py-3 px-3">
-            <div class="font-bold font-mono text-slate-800">${r.vehicleNo}</div>
-            <div class="text-[11px] text-slate-500">${r.vehicleType || '32 Ft SXL'}</div>
-          </td>
-          <td class="py-3 px-3 font-mono text-xs">
-            ${r.invoiceNo ? `<div class="text-slate-800">Inv: ${r.invoiceNo}</div>` : ''}
-            ${r.lrNo ? `<div class="text-slate-500 text-[11px]">LR: ${r.lrNo}</div>` : '--'}
-          </td>
-          <td class="py-3 px-3 font-mono text-xs text-slate-700">🔒 ${r.sealNo || '--'}</td>
-          <td class="py-3 px-3">${getPodBadgeHtml(r.podStatus)}</td>
-          <td class="py-3 px-3 text-xs font-semibold text-slate-700">${r.transporterName || 'ICRL'}</td>
-          <td class="py-3 px-3 text-xs text-slate-700">${r.supervisorName}</td>
-          <td class="py-3 px-3 font-mono text-xs text-slate-600">${r.startTime} → ${r.exitTime || 'Active'}</td>
-          <td class="py-3 px-3">
-            <span class="px-2 py-0.5 rounded text-xs font-medium ${r.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
-              ${r.status}
-            </span>
-          </td>
-          <td class="py-3 px-3 text-right">
-            <div class="flex items-center justify-end gap-1.5">
-              <button onclick="openGatePass('${r.id}')" title="Gate Pass" class="p-1 text-slate-500 hover:text-indigo-600 hover:bg-slate-100 rounded transition cursor-pointer">
-                <i data-lucide="printer" class="w-3.5 h-3.5"></i>
-              </button>
-              <button onclick="deleteRecord('${r.id}')" title="Delete" class="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-      lucide.createIcons();
-    }
-
-    // Render Visual Bay Cards (AHPL 1-4 & AIL 5-9)
-    function renderBays() {
-      const ahplContainer = document.getElementById('ahplBayGrid');
-      const ailContainer = document.getElementById('ailBayGrid');
-      ahplContainer.innerHTML = '';
-      ailContainer.innerHTML = '';
-
-      const docksConfig = [
-        { name: 'Dock 1', unit: 'AHPL', fullName: 'Dock 1 (AHPL)' },
-        { name: 'Dock 2', unit: 'AHPL', fullName: 'Dock 2 (AHPL)' },
-        { name: 'Dock 3', unit: 'AHPL', fullName: 'Dock 3 (AHPL)' },
-        { name: 'Dock 4', unit: 'AHPL', fullName: 'Dock 4 (AHPL)' },
-        { name: 'Dock 5', unit: 'AIL', fullName: 'Dock 5 (AIL)' },
-        { name: 'Dock 6', unit: 'AIL', fullName: 'Dock 6 (AIL)' },
-        { name: 'Dock 7', unit: 'AIL', fullName: 'Dock 7 (AIL)' },
-        { name: 'Dock 8', unit: 'AIL', fullName: 'Dock 8 (AIL)' },
-        { name: 'Dock 9', unit: 'AIL', fullName: 'Dock 9 (AIL)' },
-      ];
-
-      docksConfig.forEach(dock => {
-        const activeRec = records.find(r => r.gateNo.toLowerCase().includes(dock.name.toLowerCase()) && r.status === 'In-Progress');
-        const latestRec = records.find(r => r.gateNo.toLowerCase().includes(dock.name.toLowerCase()));
-
-        const targetGrid = dock.unit === 'AHPL' ? ahplContainer : ailContainer;
-        const div = document.createElement('div');
-
-        if (activeRec) {
-          div.className = 'p-4 rounded-xl border-2 border-amber-300 bg-amber-50/50 space-y-1.5';
-          div.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-slate-800 text-sm">${dock.name}</span>
-              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
-            </div>
-            <p class="text-xs text-slate-500">Vehicle: <span class="font-mono font-bold text-slate-800">${activeRec.vehicleNo}</span></p>
-            <p class="text-xs text-slate-500">Seal: <span class="font-mono font-semibold text-slate-700">${activeRec.sealNo || '--'}</span></p>
-            <p class="text-xs text-slate-500">Transporter: <span class="font-semibold text-indigo-700">${activeRec.transporterName || 'ICRL'}</span></p>
-            <p class="text-xs text-slate-500">POD: <span class="font-bold ${activeRec.podStatus === 'POD Clean' ? 'text-emerald-700' : 'text-rose-700'}">${activeRec.podStatus || 'Clean'}</span></p>
-            <div class="pt-2 flex justify-between items-center">
-              <span class="text-[11px] font-mono text-amber-700">Since ${activeRec.startTime}</span>
-              <button onclick="quickExitDock('${activeRec.id}')" class="text-[11px] bg-amber-600 hover:bg-amber-700 text-white font-semibold px-2.5 py-1 rounded cursor-pointer">Quick Exit</button>
-            </div>
-          `;
-        } else if (latestRec && latestRec.status === 'Completed') {
-          div.className = 'p-4 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5';
-          div.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-slate-600 text-sm">${dock.name}</span>
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-            </div>
-            <p class="text-xs text-slate-400">Last: <span class="font-mono text-slate-600 font-semibold">${latestRec.vehicleNo}</span></p>
-            <p class="text-xs text-slate-400">Seal: <span class="font-mono text-slate-600">${latestRec.sealNo || '--'}</span></p>
-            <p class="text-[11px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-center mt-2">Available / Cleaned</p>
-          `;
-        } else {
-          div.className = 'p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-1.5';
-          div.innerHTML = `
-            <div class="flex justify-between items-center mb-1">
-              <span class="font-bold text-slate-500 text-sm">${dock.name}</span>
-              <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
-            </div>
-            <p class="text-xs text-slate-400 py-4 text-center">Available / Idle</p>
-          `;
-        }
-        targetGrid.appendChild(div);
-      });
-    }
-
-    // Render Reports Tab Table
-    function renderReportsTable() {
-      const from = document.getElementById('filterDateFrom')?.value;
-      const to = document.getElementById('filterDateTo')?.value;
-      const unit = document.getElementById('filterUnit')?.value || 'ALL';
-      const sup = document.getElementById('filterSupervisor')?.value || 'ALL';
-      const pod = document.getElementById('filterPod')?.value || 'ALL';
-
-      const filtered = records.filter(r => {
-        if (from && r.date < from) return false;
-        if (to && r.date > to) return false;
-        if (unit !== 'ALL' && r.unit !== unit) return false;
-        if (sup !== 'ALL' && r.supervisorName !== sup) return false;
-        if (pod === 'Clean' && r.podStatus && r.podStatus !== 'POD Clean') return false;
-        if (pod === 'Hold' && (!r.podStatus || r.podStatus === 'POD Clean')) return false;
-        return true;
-      });
-
-      const tbody = document.getElementById('reportsTableBody');
-      tbody.innerHTML = '';
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="py-6 text-center text-slate-400 text-xs">No matching report records</td></tr>';
-        return;
-      }
-
-      filtered.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition';
-        tr.innerHTML = `
-          <td class="py-3 px-3">
-            <span class="font-mono text-xs text-slate-500 block">${r.date}</span>
-            <span class="font-mono text-[11px] text-slate-700 font-semibold">${r.id}</span>
-          </td>
-          <td class="py-3 px-3 font-semibold text-slate-700">${r.unit}</td>
-          <td class="py-3 px-3 font-medium text-slate-700">${r.gateNo}</td>
-          <td class="py-3 px-3">${r.operation}</td>
-          <td class="py-3 px-3">
-            <div class="font-bold font-mono text-slate-800">${r.vehicleNo}</div>
-            <div class="text-[11px] font-mono text-slate-500">🔒 ${r.sealNo || '--'}</div>
-          </td>
-          <td class="py-3 px-3 font-mono text-xs">
-            ${r.invoiceNo ? `<div>Inv: ${r.invoiceNo}</div>` : ''}
-            ${r.lrNo ? `<div class="text-slate-500 text-[11px]">LR: ${r.lrNo}</div>` : '--'}
-          </td>
-          <td class="py-3 px-3">${getPodBadgeHtml(r.podStatus)}</td>
-          <td class="py-3 px-3 text-xs font-semibold text-slate-700">${r.transporterName || 'ICRL'}</td>
-          <td class="py-3 px-3 text-xs text-slate-700">${r.supervisorName}</td>
-          <td class="py-3 px-3 font-mono text-xs">${r.startTime} → ${r.exitTime || '--:--'}</td>
-          <td class="py-3 px-3">
-            <span class="px-2 py-0.5 rounded text-xs ${r.status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
-              ${r.status}
-            </span>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function resetReportFilters() {
-      document.getElementById('filterDateFrom').value = '';
-      document.getElementById('filterDateTo').value = '';
-      document.getElementById('filterUnit').value = 'ALL';
-      document.getElementById('filterSupervisor').value = 'ALL';
-      document.getElementById('filterPod').value = 'ALL';
-      renderReportsTable();
-    }
-
-    // Modal Control: Stock
-    function openStockModal() {
-      document.getElementById('stockModal').classList.remove('hidden');
-      document.getElementById('stockModal').classList.add('flex');
-    }
-    function closeStockModal() {
-      document.getElementById('stockModal').classList.add('hidden');
-      document.getElementById('stockModal').classList.remove('flex');
-    }
-
-    // Modal Control: Gate Pass
-    function openGatePass(id) {
-      const rec = records.find(r => r.id === id);
-      if (!rec) return;
-
-      const content = document.getElementById('gatePassContent');
-      content.innerHTML = `
-        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-          <div><span class="text-slate-500">Gate Pass ID:</span> <span class="font-bold font-mono">${rec.id}</span></div>
-          <div><span class="text-slate-500">Date:</span> <span class="font-semibold">${rec.date}</span></div>
-          <div><span class="text-slate-500">Operating Unit:</span> <span class="font-bold">${rec.unit} (${rec.gateNo})</span></div>
-          <div><span class="text-slate-500">Operation:</span> <span class="font-semibold">${rec.operation}</span></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-          <div><span class="text-slate-500">Vehicle Number:</span> <span class="font-bold font-mono text-slate-900">${rec.vehicleNo}</span></div>
-          <div><span class="text-slate-500">Vehicle Type:</span> <span>${rec.vehicleType || '32 Ft SXL'}</span></div>
-          <div><span class="text-slate-500">Vehicle Seal No:</span> <span class="font-bold font-mono text-indigo-700">${rec.sealNo || 'N/A'}</span></div>
-          <div><span class="text-slate-500">Transporter:</span> <span class="font-bold text-slate-800">${rec.transporterName || 'ICRL'}</span></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
-          <div><span class="text-slate-500">Invoice Number:</span> <span class="font-mono font-semibold">${rec.invoiceNo || 'N/A'}</span></div>
-          <div><span class="text-slate-500">LR Number:</span> <span class="font-mono font-semibold">${rec.lrNo || 'N/A'}</span></div>
-          <div><span class="text-slate-500">POD Clearance:</span> <span class="font-bold ${rec.podStatus === 'POD Clean' ? 'text-emerald-700' : 'text-rose-700'}">${rec.podStatus || 'POD Clean'}</span></div>
-          <div><span class="text-slate-500">Supervisor:</span> <span class="font-semibold">${rec.supervisorName}</span></div>
-        </div>
-
-        <div class="grid grid-cols-2 gap-6 pt-6 mt-4 border-t border-slate-200 text-center">
-          <div>
-            <div class="border-b border-slate-400 w-32 mx-auto mb-1"></div>
-            <p class="text-[10px] text-slate-500 uppercase font-semibold">Security Guard Signature</p>
-          </div>
-          <div>
-            <div class="border-b border-slate-400 w-32 mx-auto mb-1"></div>
-            <p class="text-[10px] text-slate-500 uppercase font-semibold">Supervisor / Floor In-Charge</p>
-          </div>
-        </div>
-      `;
-
-      document.getElementById('gatePassModal').classList.remove('hidden');
-      document.getElementById('gatePassModal').classList.add('flex');
-    }
-
-    function closeGatePassModal() {
-      document.getElementById('gatePassModal').classList.add('hidden');
-      document.getElementById('gatePassModal').classList.remove('flex');
-    }
-
-    // ==================== EXPORT FUNCTIONS ====================
-    // 1. Export Excel (.xlsx)
-    function exportToExcel() {
-      const data = records.map((r, idx) => ({
-        'S.No': idx + 1,
-        'Record ID': r.id,
-        'Date': r.date,
-        'Unit': r.unit,
-        'Dock': r.gateNo,
-        'Operation': r.operation,
-        'Vehicle Number': r.vehicleNo,
-        'Vehicle Type': r.vehicleType || '',
-        'Seal Number': r.sealNo || '',
-        'Invoice No': r.invoiceNo || '',
-        'LR No': r.lrNo || '',
-        'POD Status': r.podStatus || 'POD Clean',
-        'Transporter': r.transporterName || 'ICRL',
-        'Supervisor': r.supervisorName,
-        'Timings': `${r.startTime} - ${r.exitTime || 'Active'}`,
-        'Status': r.status,
-        'Remarks': r.remarks || ''
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'AHPL_AIL_Log');
-      XLSX.writeFile(wb, `AHPL_AIL_Dock_Operations_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
-
-    // 2. Export PDF (.pdf)
-    function exportToPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF('landscape', 'pt', 'a4');
-
-      doc.setFontSize(16);
-      doc.setTextColor(30, 41, 59);
-      doc.text('AHPL & AIL - Dock, Transport & POD Operations Report', 40, 40);
-
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Generated on: ${new Date().toLocaleString()} | Total Records: ${records.length} | Units: AHPL (1-4) & AIL (5-9)`, 40, 58);
-
-      const tableHead = [['ID', 'Date', 'Unit', 'Dock', 'Op', 'Vehicle No', 'Seal No', 'Invoice/LR', 'POD Status', 'Transporter', 'Supervisor', 'Timings', 'Status']];
-      const tableBody = records.map(r => [
-        r.id,
-        r.date,
-        r.unit,
-        r.gateNo,
-        r.operation,
-        r.vehicleNo,
-        r.sealNo || '--',
-        r.invoiceNo ? `Inv: ${r.invoiceNo}` : r.lrNo ? `LR: ${r.lrNo}` : '--',
-        r.podStatus || 'POD Clean',
-        r.transporterName || 'ICRL',
-        r.supervisorName,
-        `${r.startTime} - ${r.exitTime || 'Active'}`,
-        r.status
-      ]);
-
-      doc.autoTable({
-        head: tableHead,
-        body: tableBody,
-        startY: 70,
-        theme: 'grid',
-        styles: { fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255] }
-      });
-
-      doc.save(`AHPL_AIL_Dock_Operations_${new Date().toISOString().slice(0,10)}.pdf`);
-    }
-
-    // 3. Export CSV
-    function exportCSV() {
-      const headers = ['ID', 'Date', 'Unit', 'Dock', 'Operation', 'VehicleNo', 'VehicleType', 'SealNo', 'InvoiceNo', 'LRNo', 'PODStatus', 'Transporter', 'Supervisor', 'StartTime', 'ExitTime', 'Status'];
-      const rows = records.map(r => [
-        `"${r.id}"`, `"${r.date}"`, `"${r.unit}"`, `"${r.gateNo}"`, `"${r.operation}"`, `"${r.vehicleNo}"`, `"${r.vehicleType || ''}"`,
-        `"${r.sealNo || ''}"`, `"${r.invoiceNo || ''}"`, `"${r.lrNo || ''}"`, `"${r.podStatus || 'POD Clean'}"`,
-        `"${r.transporterName || ''}"`, `"${r.supervisorName}"`, `"${r.startTime}"`, `"${r.exitTime || ''}"`, `"${r.status}"`
-      ]);
-
-      const csv = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-      const link = document.createElement('a');
-      link.href = encodeURI(csv);
-      link.download = `AHPL_AIL_Report_${new Date().toISOString().slice(0,10)}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // 4. Generate & Download HTML Report
-    function generateCleanHtmlTable() {
-      const rowsHtml = records.map((r, i) => `
-        <tr>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-family:monospace;">${i + 1}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-family:monospace;">${r.id}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.date}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-weight:bold;">${r.unit}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.gateNo}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.operation}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-weight:bold;font-family:monospace;">${r.vehicleNo}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-family:monospace;">${r.sealNo || '--'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.invoiceNo || '--'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.lrNo || '--'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-weight:bold;color:${r.podStatus === 'POD Clean' ? '#047857' : '#b91c1c'}">${r.podStatus || 'POD Clean'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.transporterName || 'ICRL'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.supervisorName}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;font-family:monospace;">${r.startTime} - ${r.exitTime || '--:--'}</td>
-          <td style="padding:8px;border:1px solid #e2e8f0;">${r.status}</td>
-        </tr>
-      `).join('');
-
-      return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>AHPL & AIL - Dock & Transport Operations Export Log</title>
-  <style>
-    body { font-family: sans-serif; margin: 24px; color: #1e293b; background: #f8fafc; }
-    h1 { font-size: 18px; margin-bottom: 4px; }
-    p { font-size: 12px; color: #64748b; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 12px; }
-    th { background: #0f172a; color: #fff; padding: 8px; text-align: left; font-size: 11px; }
-    tr:nth-child(even) { background-color: #f1f5f9; }
+    @media(max-width: 868px) { body { flex-direction: column; } .sidebar { width: 100%; } .main-wrapper { height: auto; } }
   </style>
 </head>
 <body>
-  <h1>AHPL & AIL - Dock, Transport & POD Operations Hub</h1>
-  <p>Export Date: ${new Date().toLocaleString()} | Total Records: ${records.length}</p>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th><th>ID</th><th>Date</th><th>Unit</th><th>Dock</th><th>Operation</th><th>Vehicle No</th><th>Seal No</th><th>Invoice</th><th>LR No</th><th>POD Status</th><th>Transporter</th><th>Supervisor</th><th>Timing</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>
-</body>
-</html>`;
+
+  <!-- SIDEBAR MENU -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <i class="fa-solid fa-truck-ramp-box"></i>
+      <span>Logistics Ops Hub</span>
+    </div>
+    <ul class="sidebar-menu">
+      <li>
+        <button class="nav-btn active" onclick="switchMenu('dashboard')">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>डैशबोर्ड (Dashboard)</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" onclick="switchMenu('taskboard')">
+          <i class="fa-solid fa-table-columns"></i>
+          <span>टास्क बोर्ड (Task Board)</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" onclick="switchMenu('gateEntry')">
+          <i class="fa-solid fa-id-card-clip"></i>
+          <span>सिक्योरिटी गेट एंट्री (Gate In)</span>
+        </button>
+      </li>
+      <li>
+        <button class="nav-btn" onclick="switchMenu('allRecords')">
+          <i class="fa-solid fa-list-check"></i>
+          <span>सभी रिकॉर्ड (Log Report)</span>
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- MAIN WRAPPER -->
+  <main class="main-wrapper">
+    <header class="top-header">
+      <h1 id="pageHeading">डैशबोर्ड (Overview & Charts)</h1>
+      <button class="btn-refresh" onclick="fetchLiveSheetData()">
+        <i class="fa-solid fa-arrows-rotate"></i> रिफ्रेश करें
+      </button>
+    </header>
+
+    <div class="content-body">
+      <!-- KPI CARDS -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-info"><p>कुल गाड़ियां (Total)</p><h2 id="kpiTotal">0</h2></div>
+          <div class="kpi-icon icon-total"><i class="fa-solid fa-truck"></i></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-info"><p>वेटिंग (Waiting)</p><h2 id="kpiWaiting">0</h2></div>
+          <div class="kpi-icon icon-waiting"><i class="fa-solid fa-clock"></i></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-info"><p>लोडिंग चालू (Loading)</p><h2 id="kpiLoading">0</h2></div>
+          <div class="kpi-icon icon-loading"><i class="fa-solid fa-box-open"></i></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-info"><p>अनलोडिंग चालू (Unloading)</p><h2 id="kpiUnloading">0</h2></div>
+          <div class="kpi-icon icon-unloading"><i class="fa-solid fa-dolly"></i></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-info"><p>पूर्ण (Completed)</p><h2 id="kpiCompleted">0</h2></div>
+          <div class="kpi-icon icon-completed"><i class="fa-solid fa-circle-check"></i></div>
+        </div>
+      </div>
+
+      <!-- 1. DASHBOARD TAB -->
+      <section id="dashboardSec" class="tab-section active">
+        <div class="chart-grid">
+          <div class="chart-card">
+            <h3><i class="fa-solid fa-chart-pie"></i> लाइव स्टेटस शेयर</h3>
+            <div class="chart-container"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <h3><i class="fa-solid fa-chart-column"></i> ट्रांसपोर्टर अनुसार गाड़ियां</h3>
+            <div class="chart-container"><canvas id="transporterChart"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. TASK BOARD TAB -->
+      <section id="taskboardSec" class="tab-section">
+        <div class="kanban-grid">
+          <div class="kanban-column">
+            <div class="column-header">
+              <span><i class="fa-solid fa-clock" style="color:var(--warning);"></i> 1. वेटिंग / गेट इन</span>
+              <span class="badge-count" id="countWaiting">0</span>
+            </div>
+            <div class="kanban-cards" id="cardsWaiting"></div>
+          </div>
+          <div class="kanban-column">
+            <div class="column-header">
+              <span><i class="fa-solid fa-box-open" style="color:var(--info);"></i> 2. लोडिंग चल रही है</span>
+              <span class="badge-count" id="countLoading">0</span>
+            </div>
+            <div class="kanban-cards" id="cardsLoading"></div>
+          </div>
+          <div class="kanban-column">
+            <div class="column-header">
+              <span><i class="fa-solid fa-dolly" style="color:var(--purple);"></i> 3. अनलोडिंग चल रही है</span>
+              <span class="badge-count" id="countUnloading">0</span>
+            </div>
+            <div class="kanban-cards" id="cardsUnloading"></div>
+          </div>
+          <div class="kanban-column">
+            <div class="column-header">
+              <span><i class="fa-solid fa-circle-check" style="color:var(--success);"></i> 4. कार्य पूर्ण (Completed)</span>
+              <span class="badge-count" id="countCompleted">0</span>
+            </div>
+            <div class="kanban-cards" id="cardsCompleted"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. GATE ENTRY TAB -->
+      <section id="gateEntrySec" class="tab-section">
+        <div class="panel-card">
+          <h3><i class="fa-solid fa-truck-arrow-right"></i> नई गाड़ी गेट एंट्री फॉर्म (Security Entry)</h3>
+          <form id="gateInForm" onsubmit="handleGateEntry(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label>गाड़ी नंबर (Vehicle Number)*</label>
+                <input type="text" id="inpVehicleNo" placeholder="जैसे: MP09 AB 1234" required>
+              </div>
+              <div class="form-group">
+                <label>ड्राइवर का नाम (Driver Name)*</label>
+                <input type="text" id="inpDriverName" placeholder="ड्राइवर का नाम" required>
+              </div>
+              <div class="form-group">
+                <label>ट्रांसपोर्टर का नाम (Transporter)*</label>
+                <input type="text" id="inpTransporter" placeholder="ट्रांसपोर्टर का नाम" required>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label>Location Type (LL / TP)*</label>
+                <select id="inpLocationType" required>
+                  <option value="">-- चुनें (Select) --</option>
+                  <option value="LL">LL</option>
+                  <option value="TP">TP</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Place of CFA / Location Name (Optional)</label>
+                <input type="text" id="inpCfaLocation" placeholder="जैसे: बलराम CFA / Indore Warehouse">
+              </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+              <i class="fa-solid fa-floppy-disk"></i> गेट एंट्री सबमिट करें (Record In-Time)
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- 4. ALL RECORDS TAB -->
+      <section id="allRecordsSec" class="tab-section">
+        <div class="panel-card">
+          <h3><i class="fa-solid fa-table-list"></i> सभी वाहनों की हिस्ट्री और लॉग्स</h3>
+          <div style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Vehicle No</th>
+                  <th>Driver</th>
+                  <th>Transporter</th>
+                  <th>Type</th>
+                  <th>Place / CFA</th>
+                  <th>Gate In</th>
+                  <th>Activity</th>
+                  <th>Start Time</th>
+                  <th>Close Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="allRecordsTableBody">
+                <tr><td colspan="11" style="text-align:center;">डेटा लोड हो रहा है...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    // अपना Apps Script Web App Deployment URL यहाँ पेस्ट करें
+    const SCRIPT_URL = localStorage.getItem('ahpl_apps_script_url') || "";
+
+    let vehiclesData = [];
+    let statusChartInstance = null;
+    let transporterChartInstance = null;
+
+    function switchMenu(tabName) {
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-section').forEach(sec => sec.classList.remove('active'));
+      const heading = document.getElementById('pageHeading');
+
+      if (tabName === 'dashboard') {
+        document.querySelectorAll('.nav-btn')[0].classList.add('active');
+        document.getElementById('dashboardSec').classList.add('active');
+        heading.innerText = "डैशबोर्ड (Overview & Charts)";
+        renderCharts();
+      } else if (tabName === 'taskboard') {
+        document.querySelectorAll('.nav-btn')[1].classList.add('active');
+        document.getElementById('taskboardSec').classList.add('active');
+        heading.innerText = "टास्क बोर्ड (Live Vehicle Pipeline)";
+        renderTaskBoard();
+      } else if (tabName === 'gateEntry') {
+        document.querySelectorAll('.nav-btn')[2].classList.add('active');
+        document.getElementById('gateEntrySec').classList.add('active');
+        heading.innerText = "सिक्योरिटी गेट एंट्री (Gate In)";
+      } else if (tabName === 'allRecords') {
+        document.querySelectorAll('.nav-btn')[3].classList.add('active');
+        document.getElementById('allRecordsSec').classList.add('active');
+        heading.innerText = "सभी वाहन रिकॉर्ड्स (History Logs)";
+        renderAllTable();
+      }
     }
 
-    function downloadHTMLReport() {
-      const html = generateCleanHtmlTable();
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `AHPL_AIL_Report_${new Date().toISOString().slice(0,10)}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    async function fetchLiveSheetData() {
+      try {
+        if (!SCRIPT_URL || SCRIPT_URL.includes("YOUR_DEPLOYMENT")) {
+          loadMockDemoData();
+          return;
+        }
+        const res = await fetch(SCRIPT_URL);
+        vehiclesData = await res.json();
+        updateAllViews();
+      } catch (err) {
+        console.warn("Using sample mock data:", err);
+        loadMockDemoData();
+      }
     }
 
-    function copyHTMLTable() {
-      const html = generateCleanHtmlTable();
-      navigator.clipboard.writeText(html).then(() => {
-        const btn = document.getElementById('copyHtmlBtn');
-        btn.innerHTML = '<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i> Copied HTML!';
-        lucide.createIcons();
-        setTimeout(() => {
-          btn.innerHTML = '<i data-lucide="copy" class="w-4 h-4"></i> Copy HTML Table';
-          lucide.createIcons();
-        }, 2500);
+    function loadMockDemoData() {
+      vehiclesData = [
+        { tokenId: "TKN-1011", inTime: "25/08/2026 10:15 AM", vehicleNo: "MP09 HG 4421", driverName: "रामेश सिंह", transporter: "V-Trans", locationType: "LL", cfaLocation: "बलराम CFA", activityType: "", startTime: "", closeTime: "", status: "Waiting for Supervisor" },
+        { tokenId: "TKN-1012", inTime: "25/08/2026 11:30 AM", vehicleNo: "MH12 DE 9901", driverName: "सुरेश यादव", transporter: "SafeXpress", locationType: "TP", cfaLocation: "", activityType: "Loading", startTime: "25/08/2026 12:10 PM", closeTime: "", status: "Loading Started" },
+        { tokenId: "TKN-1013", inTime: "25/08/2026 09:00 AM", vehicleNo: "GJ01 XY 7712", driverName: "दिलीप कुमार", transporter: "ICRL", locationType: "LL", cfaLocation: "Indore Depot", activityType: "Unloading", startTime: "25/08/2026 09:30 AM", closeTime: "25/08/2026 11:45 AM", status: "Completed" }
+      ];
+      updateAllViews();
+    }
+
+    function updateAllViews() {
+      calculateKPIs();
+      renderTaskBoard();
+      renderCharts();
+      renderAllTable();
+    }
+
+    function calculateKPIs() {
+      const total = vehiclesData.length;
+      const waiting = vehiclesData.filter(v => v.status === 'Waiting for Supervisor').length;
+      const loading = vehiclesData.filter(v => v.status === 'Loading Started').length;
+      const unloading = vehiclesData.filter(v => v.status === 'Unloading Started').length;
+      const completed = vehiclesData.filter(v => v.status === 'Completed').length;
+
+      document.getElementById('kpiTotal').innerText = total;
+      document.getElementById('kpiWaiting').innerText = waiting;
+      document.getElementById('kpiLoading').innerText = loading;
+      document.getElementById('kpiUnloading').innerText = unloading;
+      document.getElementById('kpiCompleted').innerText = completed;
+
+      document.getElementById('countWaiting').innerText = waiting;
+      document.getElementById('countLoading').innerText = loading;
+      document.getElementById('countUnloading').innerText = unloading;
+      document.getElementById('countCompleted').innerText = completed;
+    }
+
+    function renderTaskBoard() {
+      const colWaiting = document.getElementById('cardsWaiting');
+      const colLoading = document.getElementById('cardsLoading');
+      const colUnloading = document.getElementById('cardsUnloading');
+      const colCompleted = document.getElementById('cardsCompleted');
+
+      colWaiting.innerHTML = ''; colLoading.innerHTML = ''; colUnloading.innerHTML = ''; colCompleted.innerHTML = '';
+
+      vehiclesData.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+
+        const placeText = v.cfaLocation ? ` | CFA: ${v.cfaLocation}` : '';
+        const locBadge = v.locationType ? `<span class="location-tag">${v.locationType}${placeText}</span>` : '';
+
+        if (v.status === 'Waiting for Supervisor') {
+          card.innerHTML = `
+            <div class="card-top"><span class="token-tag">${v.tokenId}</span>${locBadge}</div>
+            <div class="vehicle-num">${v.vehicleNo}</div>
+            <div class="card-meta">
+              <div><i class="fa-solid fa-user"></i> ${v.driverName} (${v.transporter})</div>
+              <div><i class="fa-solid fa-clock"></i> Gate In: ${v.inTime}</div>
+            </div>
+            <div class="card-actions">
+              <button class="btn-act btn-loading" onclick="updateActivity('${v.tokenId}', 'START_ACTIVITY', 'Loading')">Start Loading</button>
+              <button class="btn-act btn-unloading" onclick="updateActivity('${v.tokenId}', 'START_ACTIVITY', 'Unloading')">Start Unloading</button>
+            </div>
+          `;
+          colWaiting.appendChild(card);
+        } else if (v.status === 'Loading Started' || v.status === 'Unloading Started') {
+          const isLoad = v.status === 'Loading Started';
+          card.innerHTML = `
+            <div class="card-top"><span class="token-tag">${v.tokenId}</span>${locBadge}</div>
+            <div class="vehicle-num">${v.vehicleNo}</div>
+            <div class="card-meta">
+              <div><i class="fa-solid fa-user"></i> ${v.driverName} (${v.transporter})</div>
+              <div><i class="fa-solid fa-clock"></i> Start: ${v.startTime}</div>
+            </div>
+            <div class="card-actions">
+              <button class="btn-act btn-finish" onclick="updateActivity('${v.tokenId}', 'CLOSE_ACTIVITY')">Complete & Close</button>
+            </div>
+          `;
+          (isLoad ? colLoading : colUnloading).appendChild(card);
+        } else if (v.status === 'Completed') {
+          card.innerHTML = `
+            <div class="card-top"><span class="token-tag">${v.tokenId}</span>${locBadge}</div>
+            <div class="vehicle-num">${v.vehicleNo}</div>
+            <div class="card-meta">
+              <div><i class="fa-solid fa-truck-fast"></i> ${v.transporter}</div>
+              <div><i class="fa-solid fa-clock-rotate-left"></i> Closed: ${v.closeTime}</div>
+            </div>
+          `;
+          colCompleted.appendChild(card);
+        }
       });
     }
 
-    // ==================== CHART.JS ANALYTICS ENGINE ====================
-    let chartInstances = {};
+    function renderCharts() {
+      const waiting = vehiclesData.filter(v => v.status === 'Waiting for Supervisor').length;
+      const loading = vehiclesData.filter(v => v.status === 'Loading Started').length;
+      const unloading = vehiclesData.filter(v => v.status === 'Unloading Started').length;
+      const completed = vehiclesData.filter(v => v.status === 'Completed').length;
 
-    function updateCharts() {
-      if (typeof Chart === 'undefined') return;
+      const ctx1 = document.getElementById('statusChart').getContext('2d');
+      if (statusChartInstance) statusChartInstance.destroy();
+      statusChartInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: ['वेटिंग', 'लोडिंग', 'अनलोडिंग', 'पूर्ण'],
+          datasets: [{ data: [waiting, loading, unloading, completed], backgroundColor: ['#f59e0b', '#06b6d4', '#8b5cf6', '#10b981'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
 
-      // 1. TAT by Dock Bay
-      const tatCtx = document.getElementById('tatChart')?.getContext('2d');
-      if (tatCtx) {
-        if (chartInstances.tat) chartInstances.tat.destroy();
-        chartInstances.tat = new Chart(tatCtx, {
-          type: 'bar',
-          data: {
-            labels: ['Dock 1', 'Dock 2', 'Dock 3', 'Dock 4', 'Dock 5', 'Dock 6', 'Dock 7', 'Dock 8', 'Dock 9'],
-            datasets: [{
-              label: 'Avg Turnaround (Mins)',
-              data: [85, 45, 95, 70, 110, 60, 80, 75, 65],
-              backgroundColor: '#4f46e5',
-              borderRadius: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, title: { display: true, text: 'Minutes' } } }
-          }
-        });
+      const transporterCounts = {};
+      vehiclesData.forEach(v => {
+        const tr = v.transporter || 'Other';
+        transporterCounts[tr] = (transporterCounts[tr] || 0) + 1;
+      });
+
+      const ctx2 = document.getElementById('transporterChart').getContext('2d');
+      if (transporterChartInstance) transporterChartInstance.destroy();
+      transporterChartInstance = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(transporterCounts),
+          datasets: [{ label: 'गाड़ियां', data: Object.values(transporterCounts), backgroundColor: '#3b82f6', borderRadius: 6 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }
+      });
+    }
+
+    function renderAllTable() {
+      const tbody = document.getElementById('allRecordsTableBody');
+      tbody.innerHTML = '';
+      if (vehiclesData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;">कोई डेटा नहीं है।</td></tr>';
+        return;
       }
+      vehiclesData.forEach(v => {
+        let badgeClass = 'st-waiting';
+        if (v.status === 'Loading Started') badgeClass = 'st-loading';
+        if (v.status === 'Unloading Started') badgeClass = 'st-unloading';
+        if (v.status === 'Completed') badgeClass = 'st-completed';
 
-      // 2. Hourly Throughput
-      const thCtx = document.getElementById('throughputChart')?.getContext('2d');
-      if (thCtx) {
-        if (chartInstances.throughput) chartInstances.throughput.destroy();
-        chartInstances.throughput = new Chart(thCtx, {
-          type: 'line',
-          data: {
-            labels: ['08:00', '10:00', '12:00', '14:00', '16:00', '18:00'],
-            datasets: [
-              { label: 'Loading', data: [2, 5, 8, 6, 7, 3], borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.15)', fill: true, tension: 0.3 },
-              { label: 'Unloading', data: [3, 4, 3, 5, 4, 2], borderColor: '#06b6d4', backgroundColor: 'rgba(6, 182, 212, 0.15)', fill: true, tension: 0.3 }
-            ]
-          },
-          options: { responsive: true, maintainAspectRatio: false }
-        });
-      }
+        tbody.innerHTML += `
+          <tr>
+            <td><b>${v.tokenId}</b></td>
+            <td><b>${v.vehicleNo}</b></td>
+            <td>${v.driverName}</td>
+            <td>${v.transporter}</td>
+            <td><b>${v.locationType || '-'}</b></td>
+            <td>${v.cfaLocation || '-'}</td>
+            <td>${v.inTime}</td>
+            <td>${v.activityType || '-'}</td>
+            <td>${v.startTime || '-'}</td>
+            <td>${v.closeTime || '-'}</td>
+            <td><span class="status-badge ${badgeClass}">${v.status}</span></td>
+          </tr>
+        `;
+      });
+    }
 
-      // 3. POD Breakdown
-      const podCtx = document.getElementById('podChart')?.getContext('2d');
-      if (podCtx) {
-        if (chartInstances.pod) chartInstances.pod.destroy();
-        const cleanCount = records.filter(r => !r.podStatus || r.podStatus === 'POD Clean').length;
-        const damageCount = records.filter(r => r.podStatus === 'POD Hold - Damage').length;
-        const claimCount = records.filter(r => r.podStatus === 'POD Hold - Insurance Claim').length;
-        const shortageCount = records.length - cleanCount - damageCount - claimCount;
+    async function handleGateEntry(e) {
+      e.preventDefault();
+      const payload = {
+        action: "SECURITY_ENTRY",
+        vehicleNo: document.getElementById('inpVehicleNo').value,
+        driverName: document.getElementById('inpDriverName').value,
+        transporter: document.getElementById('inpTransporter').value,
+        locationType: document.getElementById('inpLocationType').value,
+        cfaLocation: document.getElementById('inpCfaLocation').value
+      };
 
-        chartInstances.pod = new Chart(podCtx, {
-          type: 'doughnut',
-          data: {
-            labels: ['POD Clean', 'Damage Hold', 'Claim Hold', 'Shortage/Unloaded'],
-            datasets: [{
-              data: [cleanCount, damageCount, claimCount, Math.max(0, shortageCount)],
-              backgroundColor: ['#10b981', '#ef4444', '#f59e0b', '#ec4899']
-            }]
-          },
-          options: { responsive: true, maintainAspectRatio: false }
-        });
-      }
-
-      // 4. Transporter Share
-      const trCtx = document.getElementById('transporterChart')?.getContext('2d');
-      if (trCtx) {
-        if (chartInstances.transporter) chartInstances.transporter.destroy();
-        const trMap = {};
-        records.forEach(r => {
-          const t = r.transporterName || 'ICRL';
-          trMap[t] = (trMap[t] || 0) + 1;
-        });
-
-        chartInstances.transporter = new Chart(trCtx, {
-          type: 'bar',
-          data: {
-            labels: Object.keys(trMap),
-            datasets: [{
-              label: 'Trips Logged',
-              data: Object.values(trMap),
-              backgroundColor: '#6366f1',
-              borderRadius: 6
-            }]
-          },
-          options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } }
-          }
-        });
+      try {
+        if (SCRIPT_URL && !SCRIPT_URL.includes("YOUR_DEPLOYMENT")) {
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+        alert("गाड़ी की गेट एंट्री दर्ज हो गई!");
+        document.getElementById('gateInForm').reset();
+        setTimeout(fetchLiveSheetData, 1200);
+      } catch (err) {
+        alert("एरर आया, कनेक्शन चेक करें।");
       }
     }
 
-    // Clock Interval
-    setInterval(() => {
-      const now = new Date();
-      document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-      document.getElementById('liveDate').textContent = now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    }, 1000);
+    async function updateActivity(tokenId, actionType, activityType = "") {
+      try {
+        if (SCRIPT_URL && !SCRIPT_URL.includes("YOUR_DEPLOYMENT")) {
+          await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionType, tokenId: tokenId, activityType: activityType })
+          });
+        }
+        setTimeout(fetchLiveSheetData, 1200);
+      } catch (err) {
+        console.error("Update error:", err);
+      }
+    }
 
-    // Initial Startup
-    window.addEventListener('DOMContentLoaded', () => {
-      updateDockOptions();
-      saveRecords();
-      lucide.createIcons();
-    });
+    window.onload = fetchLiveSheetData;
   </script>
 </body>
 </html>

@@ -237,34 +237,53 @@ export default function App() {
   const handleAddGuardEntry = (entry: {
     vehicleNo: string;
     driverName: string;
+    driverMobile?: string;
     transporterName: string;
     unit: CompanyUnit;
+    locationType?: 'LL' | 'TP' | string;
+    cfaLocation?: string;
+    binNo?: string;
+    supervisor?: string;
     gateNo?: string;
+    tokenId?: string;
   }) => {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const tokenSeq = (dockRecords.length + 1).toString().padStart(3, '0');
-    const tokenId = `TOK-${tokenSeq}`;
+    const tokenId = entry.tokenId || `TKN-${tokenSeq}`;
 
     const newDockRecord: DockRecord = {
       id: `DOCK-${Date.now().toString().slice(-4)}`,
       tokenId: tokenId,
       unit: entry.unit,
-      gateNo: entry.gateNo || (entry.unit === 'AIL' ? 'Dock 5' : 'Dock 1'),
+      gateNo: entry.binNo || entry.gateNo || (entry.unit === 'AIL' ? 'Dock 5' : 'Dock 1'),
+      binNo: entry.binNo || '',
       operation: 'Loading',
       vehicleNo: entry.vehicleNo,
       driverName: entry.driverName,
+      driverMobile: entry.driverMobile || '',
       transporterName: entry.transporterName,
-      supervisorName: 'Pending Assignment',
+      locationType: entry.locationType || 'LL',
+      cfaLocation: entry.cfaLocation || '',
+      supervisorName: entry.supervisor || 'Pending Assignment',
       startTime: timeStr,
       status: 'Gate-In Waiting',
       date: dateStr,
       podStatus: 'POD Clean',
-      remarks: `Gate-In Entry via Security. Driver: ${entry.driverName}`,
+      remarks: `Gate-In Entry via Security. Driver: ${entry.driverName} ${entry.driverMobile ? `(${entry.driverMobile})` : ''}`,
     };
 
     setDockRecords((prev) => [newDockRecord, ...prev]);
+  };
+
+  const handleSyncFromSheet = (sheetRecords: DockRecord[]) => {
+    // Merge or replace sheet records seamlessly
+    setDockRecords((prev) => {
+      const existingIds = new Set(sheetRecords.map((r) => r.tokenId || r.id));
+      const filteredPrev = prev.filter((r) => !existingIds.has(r.tokenId || r.id));
+      return [...sheetRecords, ...filteredPrev];
+    });
   };
 
   const handleStartSupervisorActivity = (
@@ -395,6 +414,7 @@ export default function App() {
               onAddGuardEntry={handleAddGuardEntry}
               onStartActivity={handleStartSupervisorActivity}
               onCloseActivity={handleCloseSupervisorActivity}
+              onSyncFromSheet={handleSyncFromSheet}
             />
           </section>
         )}
