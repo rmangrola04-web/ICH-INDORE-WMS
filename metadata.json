@@ -1,0 +1,7 @@
+{
+  "name": "AHPL & AIL Warehouse & Transport Hub",
+  "description": "Dock & Transport Management and Warehouse Operations Hub for AHPL (Docks 1-4) and AIL (Docks 5-9) with live vehicle tracking, transporter metrics, gate passes, and inventory movements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
