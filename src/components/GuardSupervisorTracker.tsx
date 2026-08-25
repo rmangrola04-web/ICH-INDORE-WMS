@@ -71,13 +71,14 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [vehicleNo, setVehicleNo] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverMobile, setDriverMobile] = useState('');
-  const [activityType, setActivityType] = useState<'Loading' | 'Unloading' | ''>('');
+  const [activityType, setActivityType] = useState<'Loading' | 'Unloading' | ''>('Loading');
   const [transporter, setTransporter] = useState('');
   const [otherTransporter, setOtherTransporter] = useState('');
-  const [locationType, setLocationType] = useState<'LL' | 'TP' | ''>('');
+  const [locationType, setLocationType] = useState<string>('LL');
   const [cfaLocation, setCfaLocation] = useState('');
-  const [binNo, setBinNo] = useState('');
-  const [supervisor, setSupervisor] = useState('');
+  const [otherCfaLocation, setOtherCfaLocation] = useState('');
+  const [binNo, setBinNo] = useState('Dock-01');
+  const [supervisor, setSupervisor] = useState(SUPERVISOR_ROSTER[0]);
   const [unit, setUnit] = useState<CompanyUnit>('AHPL');
   const [guardSuccessMsg, setGuardSuccessMsg] = useState<string | null>(null);
 
@@ -101,7 +102,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  // 14-Column Google Apps Script code snippet matching user's backend
+  // Exact 14-Column Google Apps Script code snippet matching user's backend
   const APPS_SCRIPT_SNIPPET = `function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.tryLock(10000);
@@ -113,7 +114,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
     var dateToday = new Date().toLocaleDateString("en-IN");
     var fullTimestamp = dateToday + " " + now;
 
-    // 1. गेट एंट्री (Security In-Time)
+    // 1. Security Gate Entry
     if (data.action === "SECURITY_ENTRY") {
       var tokenId = "TKN-" + Math.floor(1000 + Math.random() * 9000);
       var activity = data.activityType || "Loading";
@@ -124,14 +125,14 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
         (data.vehicleNo || "").toUpperCase(),
         data.driverName || "",
         data.driverMobile || "",
+        activity,
         data.transporter || "",
         data.locationType || "",
         data.cfaLocation || "",
         data.binNo || "",
         data.supervisor || "",
-        activity,
-        "", // Start Time (In Dock Time)
-        "", // End Time (Loaded/Unloaded Time)
+        "", // In Dock Time
+        "", // End Time
         "Dock Assigned" // Status
       ]);
 
@@ -141,14 +142,12 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 2. डॉक पर काम शुरू (In Progress In Dock - Time 2)
+    // 2. Start In-Dock Activity (Time 2)
     if (data.action === "START_ACTIVITY") {
       var rows = sheet.getDataRange().getValues();
       for (var i = 1; i < rows.length; i++) {
         if (rows[i][0] == data.tokenId) {
-          var activityType = data.activityType || rows[i][10] || "Loading";
-          sheet.getRange(i + 1, 11).setValue(activityType);
-          sheet.getRange(i + 1, 12).setValue(fullTimestamp); // Col L: Start/Dock Time
+          sheet.getRange(i + 1, 12).setValue(fullTimestamp); // Col L: In Dock Time
           sheet.getRange(i + 1, 14).setValue("In Progress (In Dock)"); // Col N: Status
           break;
         }
@@ -156,15 +155,15 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 3. काम खत्म (Loaded / Unloaded - Time 3)
+    // 3. Close / Finish Activity (Time 3)
     if (data.action === "CLOSE_ACTIVITY") {
       var rows = sheet.getDataRange().getValues();
       for (var i = 1; i < rows.length; i++) {
         if (rows[i][0] == data.tokenId) {
-          var actType = rows[i][10] || "Loading";
+          var actType = rows[i][5] || "Loading";
           var finalStatus = actType === "Loading" ? "Loaded" : "Unloaded";
 
-          sheet.getRange(i + 1, 13).setValue(fullTimestamp); // Col M: Close Time
+          sheet.getRange(i + 1, 13).setValue(fullTimestamp); // Col M: End Time
           sheet.getRange(i + 1, 14).setValue(finalStatus);   // Col N: Status
           break;
         }
@@ -191,12 +190,12 @@ function doGet() {
       vehicleNo: rows[i][2],
       driverName: rows[i][3],
       driverMobile: rows[i][4],
-      transporter: rows[i][5],
-      locationType: rows[i][6],
-      cfaLocation: rows[i][7],
-      binNo: rows[i][8],
-      supervisor: rows[i][9],
-      activityType: rows[i][10],
+      activityType: rows[i][5],
+      transporter: rows[i][6],
+      locationType: rows[i][7],
+      cfaLocation: rows[i][8],
+      binNo: rows[i][9],
+      supervisor: rows[i][10],
       startTime: rows[i][11],
       closeTime: rows[i][12],
       status: rows[i][13]
@@ -345,6 +344,11 @@ function doGet() {
       selectedTransporter = 'Local Transport';
     }
 
+    let selectedCfa = cfaLocation;
+    if (selectedCfa === 'Other') {
+      selectedCfa = otherCfaLocation.trim() || 'Other';
+    }
+
     const payload = {
       action: 'SECURITY_ENTRY',
       vehicleNo: vehicleNo.trim().toUpperCase(),
@@ -353,7 +357,7 @@ function doGet() {
       activityType: (activityType as 'Loading' | 'Unloading') || 'Loading',
       transporter: selectedTransporter,
       locationType: locationType || 'LL',
-      cfaLocation: cfaLocation.trim(),
+      cfaLocation: selectedCfa.trim(),
       binNo: binNo.trim() || 'Dock-01',
       supervisor: supervisor.trim() || SUPERVISOR_ROSTER[0],
     };
@@ -404,13 +408,14 @@ function doGet() {
     setVehicleNo('');
     setDriverName('');
     setDriverMobile('');
-    setActivityType('');
+    setActivityType('Loading');
     setTransporter('');
     setOtherTransporter('');
-    setLocationType('');
+    setLocationType('LL');
     setCfaLocation('');
-    setBinNo('');
-    setSupervisor('');
+    setOtherCfaLocation('');
+    setBinNo('Dock-01');
+    setSupervisor(SUPERVISOR_ROSTER[0]);
     setTimeout(() => setGuardSuccessMsg(null), 4500);
   };
 
@@ -1170,11 +1175,11 @@ function doGet() {
                 </div>
               </div>
 
-              {/* Row 2: Assigned Purpose (Loading/Unloading Dropdown), Transporter Dropdown, Location Type */}
+              {/* Row 2: Activity Purpose, Transporter Dropdown, Location Type Dropdown */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Assigned Purpose (गाड़ी किस कार्य के लिए असाइन की है?)*
+                    Assigned Purpose (कार्य चुनें)*
                   </label>
                   <select
                     id="inpActivityType"
@@ -1183,15 +1188,14 @@ function doGet() {
                     required
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
                   >
-                    <option value="">-- कार्य चुनें (Select Purpose) --</option>
-                    <option value="Loading">📦 Loading के लिए असाइन</option>
-                    <option value="Unloading">📥 Unloading के लिए असाइन</option>
+                    <option value="Loading">📦 Loading के लिए</option>
+                    <option value="Unloading">📥 Unloading के लिए</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Transporter Name (Select Dropdown)*
+                    Transporter Name (ट्रांसपोर्टर चुनें)*
                   </label>
                   <select
                     id="inpTransporter"
@@ -1210,8 +1214,9 @@ function doGet() {
                     <option value="Gati-KWE">Gati-KWE</option>
                     <option value="Delhivery">Delhivery</option>
                     <option value="Blue Dart">Blue Dart</option>
+                    <option value="Mata Transport">Mata Transport</option>
                     <option value="Local Transport">Local Transport / Private</option>
-                    <option value="Other">Other (अन्य)</option>
+                    <option value="Other">Other (अन्य ट्रांसपोर्टर)</option>
                   </select>
                   {transporter === 'Other' && (
                     <input
@@ -1219,7 +1224,7 @@ function doGet() {
                       id="inpTransporterOther"
                       value={otherTransporter}
                       onChange={(e) => setOtherTransporter(e.target.value)}
-                      placeholder="Enter Transporter Name"
+                      placeholder="ट्रांसपोर्टर का नाम लिखें"
                       required
                       className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-blue-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-blue-50/50"
                     />
@@ -1228,56 +1233,92 @@ function doGet() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Location Type (LL / TP)*
+                    Location Type (लोकेशन / बिलिंग टाइप)*
                   </label>
                   <select
                     id="inpLocationType"
                     value={locationType}
-                    onChange={(e) => setLocationType(e.target.value as 'LL' | 'TP' | '')}
+                    onChange={(e) => setLocationType(e.target.value)}
                     required
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
                   >
-                    <option value="">-- Select Type --</option>
-                    <option value="LL">LL (Local / Own)</option>
-                    <option value="TP">TP (Third Party / CFA)</option>
+                    <option value="LL">LL (Local / Own Hub)</option>
+                    <option value="TP">TP (Third Party / Long Haul)</option>
+                    <option value="Stock Transfer">Stock Transfer (स्टॉक ट्रांसफर)</option>
+                    <option value="Billing">Billing / Invoicing (बिलिंग)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Row 3: Place of CFA, Bay/Dock No, Supervisor */}
+              {/* Row 3: Place/CFA Dropdown, Assigned Dock Dropdown, Supervisor */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Place of CFA / Location Name (Optional)
+                    Place of CFA / Destination (स्थान/CFA चुनें)*
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="inpCfaLocation"
                     value={cfaLocation}
                     onChange={(e) => setCfaLocation(e.target.value)}
-                    placeholder="जैसे: बलराम CFA / Indore Warehouse"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                  />
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="">-- स्थान / CFA चुनें --</option>
+                    <option value="Kolkata">Kolkata (कोलकाता)</option>
+                    <option value="Mumbai">Mumbai (मुंबई)</option>
+                    <option value="Delhi / NCR">Delhi / NCR</option>
+                    <option value="Raipur">Raipur (रायपुर)</option>
+                    <option value="Ahmedabad">Ahmedabad (अहमदाबाद)</option>
+                    <option value="Jaipur">Jaipur (जयपुर)</option>
+                    <option value="Indore Hub">Indore Local / Hub</option>
+                    <option value="बलराम CFA">बलराम CFA</option>
+                    <option value="Other">Other (अन्य शहर दर्ज करें)</option>
+                  </select>
+                  {cfaLocation === 'Other' && (
+                    <input
+                      type="text"
+                      id="inpLocationOther"
+                      value={otherCfaLocation}
+                      onChange={(e) => setOtherCfaLocation(e.target.value)}
+                      placeholder="शहर / CFA का नाम लिखें"
+                      required
+                      className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-blue-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-blue-50/50"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Bay / Bin / Dock No*
+                    Assigned Dock / Bay (डॉक चुनें)*
                   </label>
-                  <input
-                    type="text"
+                  <select
                     id="inpBinNo"
                     value={binNo}
                     onChange={(e) => setBinNo(e.target.value)}
-                    placeholder="e.g. Dock 1 / Bay-02"
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-mono"
-                  />
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer font-mono"
+                  >
+                    <option value="Dock-01">Dock-01</option>
+                    <option value="Dock-02">Dock-02</option>
+                    <option value="Dock-03">Dock-03</option>
+                    <option value="Dock-04">Dock-04</option>
+                    <option value="Dock-05">Dock-05</option>
+                    <option value="Dock-06">Dock-06</option>
+                    <option value="Dock-07">Dock-07</option>
+                    <option value="Dock-08">Dock-08</option>
+                    <option value="Dock-09">Dock-09</option>
+                    <option value="Dock-10">Dock-10</option>
+                    <option value="Dock-15">Dock-15</option>
+                    <option value="Dock-19">Dock-19</option>
+                    <option value="Dock-20">Dock-20</option>
+                    <option value="Bay-01">Bay-01</option>
+                    <option value="Bay-02">Bay-02</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700">
-                    Supervisor In-Charge*
+                    Supervisor In-Charge (सुपरवाइज़र)*
                   </label>
                   <input
                     type="text"
@@ -1285,7 +1326,7 @@ function doGet() {
                     list="supervisorDatalist"
                     value={supervisor}
                     onChange={(e) => setSupervisor(e.target.value)}
-                    placeholder="e.g. Ankit Dayal"
+                    placeholder="जैसे: Ankit Dayal"
                     required
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
                   />
@@ -1357,12 +1398,12 @@ function doGet() {
                   <th className="py-3 px-3 font-bold">Token</th>
                   <th className="py-3 px-3 font-bold">Vehicle No</th>
                   <th className="py-3 px-3 font-bold">Driver & Mobile</th>
+                  <th className="py-3 px-3 font-bold">Activity</th>
                   <th className="py-3 px-3 font-bold">Transporter</th>
                   <th className="py-3 px-3 font-bold">Type</th>
-                  <th className="py-3 px-3 font-bold">Place / CFA</th>
+                  <th className="py-3 px-3 font-bold">Place/CFA</th>
                   <th className="py-3 px-3 font-bold">Dock / Bay</th>
                   <th className="py-3 px-3 font-bold">Supervisor</th>
-                  <th className="py-3 px-3 font-bold">Activity</th>
                   <th className="py-3 px-3 font-bold">Gate In (Time 1)</th>
                   <th className="py-3 px-3 font-bold">In Dock (Time 2)</th>
                   <th className="py-3 px-3 font-bold">End Time (Time 3)</th>
@@ -1398,6 +1439,13 @@ function doGet() {
                             </a>
                           )}
                         </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            (r.activityType || r.operation) === 'Loading' ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {r.activityType || r.operation || 'Loading'}
+                          </span>
+                        </td>
                         <td className="py-3 px-3 text-slate-700">{r.transporterName || 'ICRL'}</td>
                         <td className="py-3 px-3">
                           {r.locationType ? (
@@ -1409,13 +1457,6 @@ function doGet() {
                         <td className="py-3 px-3 text-slate-600">{r.cfaLocation || '-'}</td>
                         <td className="py-3 px-3 font-mono font-semibold text-slate-800">{r.binNo || r.gateNo || '-'}</td>
                         <td className="py-3 px-3 text-slate-700">{r.supervisorName || '-'}</td>
-                        <td className="py-3 px-3">
-                          <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                            (r.activityType || r.operation) === 'Loading' ? 'bg-cyan-100 text-cyan-800' : 'bg-purple-100 text-purple-800'
-                          }`}>
-                            {r.activityType || r.operation || 'Loading'}
-                          </span>
-                        </td>
                         <td className="py-3 px-3 text-slate-600 font-mono text-[11px] whitespace-nowrap">
                           {r.inTime || r.startTime || '-'}
                         </td>
