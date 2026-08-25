@@ -50,9 +50,9 @@ const TRANSPORTERS = [
 
 const SUPERVISORS = [
   'Suman Singh',
-  'Ankit Dayal',
-  'Sanjay Sharma',
-  'Vikas Patel',
+  'Anup Pal',
+  'Sandeep Brokar',
+  'Kishore Sarlam',
 ];
 
 const POD_STATUS_OPTIONS = [

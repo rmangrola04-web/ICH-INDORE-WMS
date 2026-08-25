@@ -41,14 +41,8 @@ export type PodStatus =
 export const SUPERVISOR_ROSTER = [
   'Suman Singh',
   'Anup Pal',
+  'Sandeep Brokar',
   'Kishore Sarlam',
-  'R.K. Mishra',
-  'Sandeep Borkar',
-  'Ankit Dayal',
-  'Varun Swami',
-  'Kanhaiya Patel',
-  'Deepesh Sethi',
-  'Rahul Prajapati',
 ] as const;
 
 export type SupervisorName = typeof SUPERVISOR_ROSTER[number] | string;
