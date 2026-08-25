@@ -71,12 +71,13 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [vehicleNo, setVehicleNo] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverMobile, setDriverMobile] = useState('');
-  const [activityType, setActivityType] = useState<'Loading' | 'Unloading'>('Loading');
-  const [transporter, setTransporter] = useState('ICRL');
-  const [locationType, setLocationType] = useState<'LL' | 'TP' | ''>('LL');
+  const [activityType, setActivityType] = useState<'Loading' | 'Unloading' | ''>('');
+  const [transporter, setTransporter] = useState('');
+  const [otherTransporter, setOtherTransporter] = useState('');
+  const [locationType, setLocationType] = useState<'LL' | 'TP' | ''>('');
   const [cfaLocation, setCfaLocation] = useState('');
-  const [binNo, setBinNo] = useState('Dock-01');
-  const [supervisor, setSupervisor] = useState<string>(SUPERVISOR_ROSTER[0]);
+  const [binNo, setBinNo] = useState('');
+  const [supervisor, setSupervisor] = useState('');
   const [unit, setUnit] = useState<CompanyUnit>('AHPL');
   const [guardSuccessMsg, setGuardSuccessMsg] = useState<string | null>(null);
 
@@ -332,71 +333,84 @@ function doGet() {
     }
   };
 
-  // Handle Security Gate Entry Submission (with Mobile, Bay/Bin, Supervisor, Activity)
+  // Handle Security Gate Entry Submission (Matching handleGateEntry with payload & webhook fetch)
   const handleGuardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleNo.trim() || !driverName.trim()) return;
 
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    const dateToday = now.toLocaleDateString('en-IN');
-    const fullTimestamp = `${dateToday} ${timeStr}`;
+    let selectedTransporter = transporter;
+    if (selectedTransporter === 'Other') {
+      selectedTransporter = otherTransporter.trim() || 'Other';
+    } else if (!selectedTransporter) {
+      selectedTransporter = 'Local Transport';
+    }
 
-    const vNo = vehicleNo.trim().toUpperCase();
-    const dName = driverName.trim();
-    const dMobile = driverMobile.trim();
-    const tName = transporter.trim();
-    const locType = locationType || 'LL';
-    const cfaLoc = cfaLocation.trim();
-    const bNo = binNo.trim() || 'Dock-01';
-    const supName = supervisor.trim() || SUPERVISOR_ROSTER[0];
+    const payload = {
+      action: 'SECURITY_ENTRY',
+      vehicleNo: vehicleNo.trim().toUpperCase(),
+      driverName: driverName.trim(),
+      driverMobile: driverMobile.trim(),
+      activityType: (activityType as 'Loading' | 'Unloading') || 'Loading',
+      transporter: selectedTransporter,
+      locationType: locationType || 'LL',
+      cfaLocation: cfaLocation.trim(),
+      binNo: binNo.trim() || 'Dock-01',
+      supervisor: supervisor.trim() || SUPERVISOR_ROSTER[0],
+    };
+
     const generatedToken = `TKN-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    // Immediate local state update
     onAddGuardEntry({
-      vehicleNo: vNo,
-      driverName: dName,
-      driverMobile: dMobile,
-      transporterName: tName,
+      vehicleNo: payload.vehicleNo,
+      driverName: payload.driverName,
+      driverMobile: payload.driverMobile,
+      transporterName: payload.transporter,
       unit,
-      locationType: locType,
-      cfaLocation: cfaLoc,
-      binNo: bNo,
-      supervisor: supName,
+      locationType: payload.locationType,
+      cfaLocation: payload.cfaLocation,
+      binNo: payload.binNo,
+      supervisor: payload.supervisor,
       tokenId: generatedToken,
-      activityType: activityType,
+      activityType: payload.activityType,
     });
 
-    // If Apps Script URL is configured, send async POST with exact 14-column matching payload
+    setGuardSuccessMsg(
+      lang === 'hi'
+        ? `गाड़ी की एंट्री सफलतापूर्वक दर्ज हो गई! (Token: ${generatedToken})`
+        : `Vehicle Gate Entry successfully recorded! (Token: ${generatedToken})`
+    );
+
+    // If Google Apps Script Webhook URL is present, post with no-cors and trigger live sheet sync
     if (appsScriptUrl.trim()) {
       try {
-        fetch(appsScriptUrl.trim(), {
+        await fetch(appsScriptUrl.trim(), {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'SECURITY_ENTRY',
-            vehicleNo: vNo,
-            driverName: dName,
-            driverMobile: dMobile,
-            transporter: tName,
-            locationType: locType,
-            cfaLocation: cfaLoc,
-            binNo: bNo,
-            supervisor: supName,
-            activityType: activityType,
-            timestamp: fullTimestamp,
-          }),
-        }).catch((err) => console.warn('Apps script sync notice:', err));
+          body: JSON.stringify(payload),
+        });
+
+        // Trigger live sheet refresh after slight delay
+        setTimeout(() => {
+          handleFetchFromSheet();
+        }, 1200);
       } catch (err) {
-        console.warn('Apps script sync error:', err);
+        console.warn('Google Sheet Webhook POST error:', err);
       }
     }
 
-    setGuardSuccessMsg(`Token ${generatedToken} Generated & Gate-In Recorded for ${vNo}`);
+    // Form Reset
     setVehicleNo('');
     setDriverName('');
     setDriverMobile('');
+    setActivityType('');
+    setTransporter('');
+    setOtherTransporter('');
+    setLocationType('');
     setCfaLocation('');
+    setBinNo('');
+    setSupervisor('');
     setTimeout(() => setGuardSuccessMsg(null), 4500);
   };
 
@@ -1087,176 +1101,214 @@ function doGet() {
         </div>
       )}
 
-      {/* 3. GATE ENTRY TAB (Full 9-Field Form matching user HTML) */}
+      {/* 3. GATE ENTRY TAB */}
       {activeSubTab === 'gateEntry' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6 max-w-4xl mx-auto">
-          <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-              <Shield className="w-5 h-5 text-blue-600" />
-              <span>{lang === 'hi' ? 'सिक्योरिटी गेट एंट्री एवं डॉक असाइनमेंट' : 'Security Gate In Entry & Dock Assignment'}</span>
-            </h3>
-            <span className="text-xs text-slate-500">Security Gate In-Time (Time 1)</span>
+        <section id="gateEntrySec" className="tab-section max-w-4xl mx-auto">
+          <div className="panel-card bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-6">
+            <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <Truck className="w-5 h-5 text-blue-600" />
+                <span>New Vehicle Gate Entry Form (Security)</span>
+              </h3>
+              <span className="text-xs text-slate-500 font-medium">Security Gate In-Time (Time 1)</span>
+            </div>
+
+            {guardSuccessMsg && (
+              <div className="bg-emerald-50 border border-emerald-300 p-4 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{guardSuccessMsg}</span>
+              </div>
+            )}
+
+            <form id="gateInForm" onSubmit={handleGuardSubmit} className="space-y-5">
+              {/* Row 1: Vehicle No, Driver Name, Driver Mobile */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Vehicle Number*
+                  </label>
+                  <input
+                    type="text"
+                    id="inpVehicleNo"
+                    value={vehicleNo}
+                    onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
+                    placeholder="e.g. MP09 AB 1234"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Driver Name*
+                  </label>
+                  <input
+                    type="text"
+                    id="inpDriverName"
+                    value={driverName}
+                    onChange={(e) => setDriverName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Driver Mobile*
+                  </label>
+                  <input
+                    type="tel"
+                    id="inpDriverMobile"
+                    value={driverMobile}
+                    onChange={(e) => setDriverMobile(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    pattern="[0-9]{10}"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Assigned Purpose (Loading/Unloading Dropdown), Transporter Dropdown, Location Type */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Assigned Purpose (गाड़ी किस कार्य के लिए असाइन की है?)*
+                  </label>
+                  <select
+                    id="inpActivityType"
+                    value={activityType}
+                    onChange={(e) => setActivityType(e.target.value as 'Loading' | 'Unloading' | '')}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="">-- कार्य चुनें (Select Purpose) --</option>
+                    <option value="Loading">📦 Loading के लिए असाइन</option>
+                    <option value="Unloading">📥 Unloading के लिए असाइन</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Transporter Name (Select Dropdown)*
+                  </label>
+                  <select
+                    id="inpTransporter"
+                    value={transporter}
+                    onChange={(e) => setTransporter(e.target.value)}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="">-- चुनें (Select Transporter) --</option>
+                    <option value="DHTC">DHTC</option>
+                    <option value="V-Trans">V-Trans</option>
+                    <option value="TCI Freight">TCI Freight</option>
+                    <option value="SafeXpress">SafeXpress</option>
+                    <option value="Spoton">Spoton</option>
+                    <option value="ARC">ARC</option>
+                    <option value="Gati-KWE">Gati-KWE</option>
+                    <option value="Delhivery">Delhivery</option>
+                    <option value="Blue Dart">Blue Dart</option>
+                    <option value="Local Transport">Local Transport / Private</option>
+                    <option value="Other">Other (अन्य)</option>
+                  </select>
+                  {transporter === 'Other' && (
+                    <input
+                      type="text"
+                      id="inpTransporterOther"
+                      value={otherTransporter}
+                      onChange={(e) => setOtherTransporter(e.target.value)}
+                      placeholder="Enter Transporter Name"
+                      required
+                      className="w-full mt-1.5 px-3.5 py-2 rounded-xl border border-blue-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-blue-50/50"
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Location Type (LL / TP)*
+                  </label>
+                  <select
+                    id="inpLocationType"
+                    value={locationType}
+                    onChange={(e) => setLocationType(e.target.value as 'LL' | 'TP' | '')}
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="">-- Select Type --</option>
+                    <option value="LL">LL (Local / Own)</option>
+                    <option value="TP">TP (Third Party / CFA)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 3: Place of CFA, Bay/Dock No, Supervisor */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Place of CFA / Location Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="inpCfaLocation"
+                    value={cfaLocation}
+                    onChange={(e) => setCfaLocation(e.target.value)}
+                    placeholder="जैसे: बलराम CFA / Indore Warehouse"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Bay / Bin / Dock No*
+                  </label>
+                  <input
+                    type="text"
+                    id="inpBinNo"
+                    value={binNo}
+                    onChange={(e) => setBinNo(e.target.value)}
+                    placeholder="e.g. Dock 1 / Bay-02"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">
+                    Supervisor In-Charge*
+                  </label>
+                  <input
+                    type="text"
+                    id="inpSupervisor"
+                    list="supervisorDatalist"
+                    value={supervisor}
+                    onChange={(e) => setSupervisor(e.target.value)}
+                    placeholder="e.g. Ankit Dayal"
+                    required
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+                  />
+                  <datalist id="supervisorDatalist">
+                    {SUPERVISOR_ROSTER.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                className="btn-submit w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2 mt-2"
+                style={{ width: '100%', justifyContent: 'center', padding: '13px', fontSize: '1rem', marginTop: '8px' }}
+              >
+                <Send className="w-4 h-4" />
+                <span>Submit Gate Entry (Record In-Time)</span>
+              </button>
+            </form>
           </div>
-
-          {guardSuccessMsg && (
-            <div className="bg-emerald-50 border border-emerald-300 p-4 rounded-xl text-emerald-900 text-xs font-semibold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{guardSuccessMsg}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleGuardSubmit} className="space-y-5">
-            {/* Row 1: Vehicle No, Driver Name, Driver Mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'गाड़ी नंबर (Vehicle Number)*' : 'Vehicle Number*'}
-                </label>
-                <input
-                  type="text"
-                  value={vehicleNo}
-                  onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
-                  placeholder="e.g. MP09 AB 1234"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono uppercase focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'ड्राइवर का नाम (Driver Name)*' : 'Driver Name*'}
-                </label>
-                <input
-                  type="text"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  placeholder="e.g. Ramesh Singh"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'ड्राइवर मोबाइल (Driver Mobile)*' : 'Driver Mobile*'}
-                </label>
-                <input
-                  type="tel"
-                  value={driverMobile}
-                  onChange={(e) => setDriverMobile(e.target.value)}
-                  placeholder="10-digit mobile number"
-                  pattern="[0-9]{10}"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                />
-              </div>
-            </div>
-
-            {/* Row 2: Activity Type, Transporter, Location Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'कार्य का प्रकार (Activity)*' : 'Activity Type*'}
-                </label>
-                <select
-                  value={activityType}
-                  onChange={(e) => setActivityType(e.target.value as 'Loading' | 'Unloading')}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                >
-                  <option value="Loading">Loading (लोडिंग)</option>
-                  <option value="Unloading">Unloading (अनलोडिंग)</option>
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'ट्रांसपोर्टर का नाम (Transporter)*' : 'Transporter Name*'}
-                </label>
-                <input
-                  type="text"
-                  value={transporter}
-                  onChange={(e) => setTransporter(e.target.value)}
-                  placeholder="e.g. ICRL / V-Trans / MCM"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  Location Type (LL / TP)*
-                </label>
-                <select
-                  value={locationType}
-                  onChange={(e) => setLocationType(e.target.value as 'LL' | 'TP' | '')}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                >
-                  <option value="">-- चुनें (Select) --</option>
-                  <option value="LL">LL (Local / Intra-hub)</option>
-                  <option value="TP">TP (Third Party / Long Haul)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Row 3: Place/CFA, Assigned Dock/Bay, Assigned Supervisor */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  Place / CFA (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={cfaLocation}
-                  onChange={(e) => setCfaLocation(e.target.value)}
-                  placeholder="e.g. Balram CFA / Indore"
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'असाइन किया गया बे/डॉक नंबर (Dock/Bay)*' : 'Assigned Dock / Bay No*'}
-                </label>
-                <input
-                  type="text"
-                  value={binNo}
-                  onChange={(e) => setBinNo(e.target.value)}
-                  placeholder="e.g. Dock-01 / Bay-3"
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-mono"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">
-                  {lang === 'hi' ? 'असाइन किया गया सुपरवाइज़र*' : 'Assigned Supervisor*'}
-                </label>
-                <select
-                  value={supervisor}
-                  onChange={(e) => setSupervisor(e.target.value)}
-                  required
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white cursor-pointer"
-                >
-                  {SUPERVISOR_ROSTER.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              <span>{lang === 'hi' ? 'गेट एंट्री दर्ज करें (Record Gate In)' : 'Record Gate In (Generate Token)'}</span>
-            </button>
-          </form>
-        </div>
+        </section>
       )}
 
       {/* 4. ALL RECORDS TAB (History Logs & 14-Col Overview) */}
