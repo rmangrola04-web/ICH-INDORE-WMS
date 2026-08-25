@@ -129,6 +129,11 @@ export const t = {
 
     // Dock & Supervisor Tracker
     dockTab: 'डॉक एवं सुपरवाइजर TAT कंट्रोल',
+    tabLoading: 'लोडिंग व डिस्पैच लॉग',
+    tabLive: 'लाइव एक्टिविटी एवं डॉक्स',
+    tabTracker: 'वाहन मूवमेंट ट्रैकर',
+    tabReports: 'रिपोर्ट्स व एक्सपोर्ट',
+    tabAnalytics: 'एनालिटिक्स व ग्राफ्स',
     movementTab: 'वेयरहाउस मूवमेंट लॉग',
     activeBays: 'एक्टिव लोडिंग बे (Bays)',
     activeSupervisors: 'एक्टिव सुपरवाइजर्स',
@@ -281,6 +286,11 @@ export const t = {
 
     // Dock & Supervisor Tracker
     dockTab: 'Dock & Supervisor TAT Control',
+    tabLoading: 'Loading & Dispatch Log',
+    tabLive: 'Live Activity & Docks',
+    tabTracker: 'Movement Tracker',
+    tabReports: 'Reports & Export',
+    tabAnalytics: 'Analytics & Graphs',
     movementTab: 'Warehouse Movement Log',
     activeBays: 'Active Loading Bays',
     activeSupervisors: 'Active Supervisors',

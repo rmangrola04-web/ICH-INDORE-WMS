@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, DockOperation, DockStatus, PodStatus, Language, AttachedDocument } from '../types';
 import { t } from '../utils/translations';
-import { exportToExcel, exportToPDF, downloadHTMLReport, generateHTMLReport } from '../utils/exportUtils';
+import { exportToExcel, exportToPDF, downloadHTMLReport, generateHTMLReport, downloadStandaloneAppHTML } from '../utils/exportUtils';
+
 
 interface ReportsViewProps {
   records: DockRecord[];
@@ -293,6 +294,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
           {/* Export Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Single App HTML for GitHub */}
+            <button
+              type="button"
+              onClick={() => downloadStandaloneAppHTML('index.html')}
+              className="bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              title="Download single-file standalone index.html ready for GitHub Pages or repository upload"
+            >
+              <Download className="w-4 h-4" />
+              <span>GitHub Single HTML</span>
+            </button>
+
             {/* Excel (.xlsx) */}
             <button
               type="button"

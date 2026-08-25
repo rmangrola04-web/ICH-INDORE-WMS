@@ -214,3 +214,26 @@ export const downloadHTMLReport = (records: DockRecord[], filename: string = 'AH
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+export const downloadStandaloneAppHTML = async (filename: string = 'index.html') => {
+  try {
+    const res = await fetch('/standalone.html');
+    if (res.ok) {
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return;
+    }
+  } catch (err) {
+    console.error('Fetch failed, falling back to direct open', err);
+  }
+  window.open('/standalone.html', '_blank');
+};
+

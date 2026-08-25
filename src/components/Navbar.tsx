@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Warehouse, Globe, PackageCheck, ShieldCheck } from 'lucide-react';
+import { Warehouse, Globe, PackageCheck, ShieldCheck, Download, Github, Code } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../utils/translations';
+import { downloadStandaloneAppHTML } from '../utils/exportUtils';
 
 interface NavbarProps {
   lang: Language;
@@ -69,7 +70,19 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Right Status and Controls */}
-        <div className="flex items-center flex-wrap gap-2.5 sm:gap-4 text-sm">
+        <div className="flex items-center flex-wrap gap-2 sm:gap-3 text-sm">
+          {/* GitHub Single HTML Download */}
+          <button
+            type="button"
+            id="downloadGithubHtmlBtn"
+            onClick={() => downloadStandaloneAppHTML('index.html')}
+            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+            title="Download complete standalone HTML file (index.html) for GitHub / GitHub Pages"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Download GitHub HTML</span>
+          </button>
+
           {/* Inventory Overview Button */}
           <button
             type="button"
@@ -101,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
 
           {/* Live Clock & Date */}
-          <div className="text-right hidden sm:block">
+          <div className="text-right hidden md:block">
             <div id="liveClock" className="text-slate-200 font-mono text-xs font-semibold tracking-wider">
               {currentTime}
             </div>
@@ -114,3 +127,4 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+

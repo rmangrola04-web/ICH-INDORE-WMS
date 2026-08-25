@@ -14,7 +14,8 @@ import { EditDockModal } from './components/EditDockModal';
 import { LiveActivityView } from './components/LiveActivityView';
 import { ReportsView } from './components/ReportsView';
 import { AnalyticsView } from './components/AnalyticsView';
-import { MovementRecord, MovementStatus, DockRecord, DockStatus, AppTab, Language } from './types';
+import { GuardSupervisorTracker } from './components/GuardSupervisorTracker';
+import { MovementRecord, MovementStatus, DockRecord, DockStatus, AppTab, Language, CompanyUnit } from './types';
 import { INITIAL_RECORDS, INITIAL_DOCK_RECORDS } from './data/initialData';
 import { t } from './utils/translations';
 
@@ -232,6 +233,82 @@ export default function App() {
     );
   };
 
+  // Guard & Supervisor Tracker Handlers
+  const handleAddGuardEntry = (entry: {
+    vehicleNo: string;
+    driverName: string;
+    transporterName: string;
+    unit: CompanyUnit;
+    gateNo?: string;
+  }) => {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const tokenSeq = (dockRecords.length + 1).toString().padStart(3, '0');
+    const tokenId = `TOK-${tokenSeq}`;
+
+    const newDockRecord: DockRecord = {
+      id: `DOCK-${Date.now().toString().slice(-4)}`,
+      tokenId: tokenId,
+      unit: entry.unit,
+      gateNo: entry.gateNo || (entry.unit === 'AIL' ? 'Dock 5' : 'Dock 1'),
+      operation: 'Loading',
+      vehicleNo: entry.vehicleNo,
+      driverName: entry.driverName,
+      transporterName: entry.transporterName,
+      supervisorName: 'Pending Assignment',
+      startTime: timeStr,
+      status: 'Gate-In Waiting',
+      date: dateStr,
+      podStatus: 'POD Clean',
+      remarks: `Gate-In Entry via Security. Driver: ${entry.driverName}`,
+    };
+
+    setDockRecords((prev) => [newDockRecord, ...prev]);
+  };
+
+  const handleStartSupervisorActivity = (
+    id: string,
+    activityType: 'Loading' | 'Unloading',
+    supervisorName: string,
+    gateNo: string
+  ) => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    setDockRecords((prev) =>
+      prev.map((rec) => {
+        if (rec.id !== id) return rec;
+        return {
+          ...rec,
+          operation: activityType,
+          supervisorName: supervisorName,
+          gateNo: gateNo,
+          startTime: timeStr,
+          status: 'In-Progress' as DockStatus,
+          remarks: `${activityType} started by Supervisor ${supervisorName}`,
+        };
+      })
+    );
+  };
+
+  const handleCloseSupervisorActivity = (id: string) => {
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    setDockRecords((prev) =>
+      prev.map((rec) => {
+        if (rec.id !== id) return rec;
+        return {
+          ...rec,
+          exitTime: timeStr,
+          status: 'Completed' as DockStatus,
+          remarks: `Operation closed & dispatched at ${timeStr}`,
+        };
+      })
+    );
+  };
+
   const handleToggleLang = () => {
     setLang((prev) => (prev === 'hi' ? 'en' : 'hi'));
   };
@@ -305,6 +382,19 @@ export default function App() {
               onQuickComplete={handleQuickCompleteDock}
               onAssignGate={(_gate) => setActiveTab('loading')}
               onEditRecord={(rec) => setEditingDockRecord(rec)}
+            />
+          </section>
+        )}
+
+        {/* TAB: VEHICLE MOVEMENT TRACKER (GUARD & SUPERVISOR) */}
+        {activeTab === 'tracker' && (
+          <section id="trackerTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+            <GuardSupervisorTracker
+              records={dockRecords}
+              lang={lang}
+              onAddGuardEntry={handleAddGuardEntry}
+              onStartActivity={handleStartSupervisorActivity}
+              onCloseActivity={handleCloseSupervisorActivity}
             />
           </section>
         )}

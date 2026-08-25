@@ -38,6 +38,11 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       pulse: true,
     },
     {
+      id: 'tracker',
+      label: dict.tabTracker || (lang === 'hi' ? 'गेट व सुपरवाइजर ट्रैकर' : 'Movement Tracker'),
+      icon: <Warehouse className="w-4 h-4" />,
+    },
+    {
       id: 'reports',
       label: dict.tabReports,
       icon: <FileSpreadsheet className="w-4 h-4" />,

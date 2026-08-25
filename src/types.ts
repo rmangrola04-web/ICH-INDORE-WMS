@@ -2,7 +2,7 @@ export type CompanyUnit = 'AHPL' | 'AIL' | 'AHPL & AIL';
 export type MovementType = 'Inbound' | 'Outbound';
 export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
-export type AppTab = 'loading' | 'live' | 'reports' | 'analytics' | 'movement';
+export type AppTab = 'loading' | 'live' | 'tracker' | 'reports' | 'analytics' | 'movement';
 
 export type DockStatus = 'Completed' | 'In-Progress' | 'Gate-In Waiting';
 export type DockOperation = 'Loading' | 'Unloading';
@@ -62,12 +62,14 @@ export interface AttachedDocument {
 
 export interface DockRecord {
   id: string;
+  tokenId?: string;
   unit: CompanyUnit;
   gateNo: string;
   operation: DockOperation;
   vehicleType?: VehicleType;
   transporterName?: TransporterName;
   vehicleNo: string;
+  driverName?: string;
   sealNo?: string;
   invoiceNo?: string;
   lrNo?: string;
