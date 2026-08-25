@@ -51,20 +51,20 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
         {/* Brand Header */}
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-600 rounded-xl shadow-inner flex items-center justify-center text-white">
+          <div className="bg-blue-600 w-11 h-11 rounded-xl shadow-inner flex items-center justify-center text-white shrink-0">
             <Warehouse className="w-6 h-6" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-bold tracking-wide text-white">
-                AHPL & AIL
+              <h1 className="text-base sm:text-lg lg:text-xl font-extrabold tracking-wide text-white">
+                INTRIGATED CENTRAL HUB - INDORE
               </h1>
-              <span className="text-xs bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md border border-indigo-400/30 font-medium">
+              <span className="text-xs bg-blue-600/25 text-blue-300 px-2 py-0.5 rounded border border-blue-500/50 font-bold tracking-wide">
                 Dock Operations
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-medium">
-              AHPL: Docks 1–4 | AIL: Docks 5–9 | Dispatch & POD Audit Control
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Docks 1 to 9 | Movement, Dispatch & Audit Control
             </p>
           </div>
         </div>

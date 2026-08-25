@@ -399,6 +399,7 @@ export default function App() {
                   onBulkDelete={handleBulkDeleteDock}
                   onEditRecord={(rec) => setEditingDockRecord(rec)}
                   onQuickComplete={handleQuickCompleteDock}
+                  onApplyCSVImport={(updated) => setDockRecords(updated)}
                 />
               </div>
             </div>
@@ -428,6 +429,7 @@ export default function App() {
               onStartActivity={handleStartSupervisorActivity}
               onCloseActivity={handleCloseSupervisorActivity}
               onSyncFromSheet={handleSyncFromSheet}
+              onBatchUpdateRecords={(updated) => setDockRecords(updated)}
             />
           </section>
         )}
@@ -440,6 +442,7 @@ export default function App() {
               lang={lang}
               onEditRecord={(rec) => setEditingDockRecord(rec)}
               onDeleteRecord={handleDeleteDockRecord}
+              onApplyCSVImport={(updated) => setDockRecords(updated)}
             />
           </section>
         )}

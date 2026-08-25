@@ -15,18 +15,21 @@ import {
   Trash2,
   Edit,
   ExternalLink,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, DockOperation, DockStatus, PodStatus, Language, AttachedDocument } from '../types';
 import { t } from '../utils/translations';
 import { exportToExcel, exportToPDF, downloadHTMLReport, generateHTMLReport, downloadStandaloneAppHTML } from '../utils/exportUtils';
-
+import { CSVImportModal } from './CSVImportModal';
+import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
 
 interface ReportsViewProps {
   records: DockRecord[];
   lang: Language;
   onEditRecord: (record: DockRecord) => void;
   onDeleteRecord: (id: string) => void;
+  onApplyCSVImport?: (records: DockRecord[]) => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -34,6 +37,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   lang,
   onEditRecord,
   onDeleteRecord,
+  onApplyCSVImport,
 }) => {
   const dict = t[lang];
 
@@ -50,6 +54,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   // Modals / Copied state
   const [copiedHtml, setCopiedHtml] = useState<boolean>(false);
   const [previewDoc, setPreviewDoc] = useState<{ doc: AttachedDocument; vehicleNo: string } | null>(null);
+  const [isCSVModalOpen, setIsCSVModalOpen] = useState<boolean>(false);
+  const [csvSuccessMsg, setCsvSuccessMsg] = useState<string | null>(null);
+
+  const handleApplyImport = (updatedRecords: DockRecord[], summary: CSVImportResult) => {
+    if (onApplyCSVImport) {
+      onApplyCSVImport(updatedRecords);
+    }
+    const msg = `CSV Update Complete: ${summary.updatedCount} records corrected, ${summary.addedCount} new entries added!`;
+    setCsvSuccessMsg(msg);
+    setTimeout(() => setCsvSuccessMsg(null), 6000);
+  };
 
   // Extract unique supervisors
   const uniqueSupervisors = useMemo(() => {
@@ -292,8 +307,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </p>
           </div>
 
-          {/* Export Action Buttons */}
+          {/* Export & Import Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* CSV / Excel Upload to Correct Data */}
+            <button
+              type="button"
+              onClick={() => setIsCSVModalOpen(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              title="Upload CSV or Excel file to update incorrect fields like Transporter, Location, Supervisor"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>{lang === 'hi' ? 'CSV डेटा अपलोड / सुधार' : 'Upload / Correct CSV'}</span>
+            </button>
+
+            {/* Download 14-Col Template */}
+            <button
+              type="button"
+              onClick={() => downloadSampleCSVTemplate()}
+              className="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+              title="Download standard 14-column CSV template"
+            >
+              <Download className="w-4 h-4 text-blue-600" />
+              <span>Sample CSV</span>
+            </button>
+
             {/* Single App HTML for GitHub */}
             <button
               type="button"
@@ -715,6 +752,15 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* CSV / Excel Upload Modal */}
+      <CSVImportModal
+        isOpen={isCSVModalOpen}
+        onClose={() => setIsCSVModalOpen(false)}
+        existingRecords={records}
+        onApplyImport={handleApplyImport}
+        lang={lang}
+      />
     </div>
   );
 };

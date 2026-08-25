@@ -32,11 +32,16 @@ import {
   Calendar,
   Monitor,
   Smartphone,
+  Tablet,
   Sparkles,
   ChevronRight,
+  UploadCloud,
+  Download,
   X
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, SUPERVISOR_ROSTER, Language } from '../types';
+import { CSVImportModal } from './CSVImportModal';
+import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
 
 interface GuardSupervisorTrackerProps {
   records: DockRecord[];
@@ -58,6 +63,7 @@ interface GuardSupervisorTrackerProps {
   onStartActivity: (id: string, activityType: 'Loading' | 'Unloading', supervisorName: string, gateNo: string) => void;
   onCloseActivity: (id: string) => void;
   onSyncFromSheet?: (sheetRecords: DockRecord[]) => void;
+  onBatchUpdateRecords?: (records: DockRecord[]) => void;
 }
 
 export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
@@ -67,9 +73,25 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   onStartActivity,
   onCloseActivity,
   onSyncFromSheet,
+  onBatchUpdateRecords,
 }) => {
-  // View mode switcher: 'auto' | 'desktop' | 'mobile'
-  const [viewMode, setViewMode] = useState<'auto' | 'desktop' | 'mobile'>('auto');
+  // View mode switcher: 'auto' | 'laptop' | 'tablet' | 'mobile' (with 'desktop' aliasing to laptop)
+  const [viewMode, setViewMode] = useState<'auto' | 'laptop' | 'desktop' | 'tablet' | 'mobile'>('auto');
+
+  // CSV Import Modal & Feedback State
+  const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
+  const [csvSuccessMsg, setCsvSuccessMsg] = useState<string | null>(null);
+
+  const handleApplyCSVImport = (updatedRecords: DockRecord[], summary: CSVImportResult) => {
+    if (onBatchUpdateRecords) {
+      onBatchUpdateRecords(updatedRecords);
+    } else if (onSyncFromSheet) {
+      onSyncFromSheet(updatedRecords);
+    }
+    const msg = `CSV Update Successful! ${summary.updatedCount} records corrected, ${summary.addedCount} new records added (${summary.totalParsed} total rows processed).`;
+    setCsvSuccessMsg(msg);
+    setTimeout(() => setCsvSuccessMsg(null), 8000);
+  };
 
   // Desktop active tab
   const [desktopTab, setDesktopTab] = useState<'dashboard' | 'taskboard' | 'gateEntry' | 'records'>('dashboard');
@@ -522,7 +544,7 @@ function doGet() {
 
   return (
     <div className="bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-      {/* 1. Mode Switcher Top Bar */}
+      {/* 1. Mode Switcher Top Bar / Device Switcher Controls */}
       <div className="bg-slate-800 text-slate-300 px-4 py-2 flex items-center justify-between text-xs font-semibold">
         <div className="flex items-center gap-2">
           <Truck className="w-4 h-4 text-blue-400" />
@@ -532,42 +554,124 @@ function doGet() {
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] text-slate-400 mr-1">View Mode:</span>
+        <div className="device-switcher-bar flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-lg border border-slate-700">
+          <span className="text-[11px] text-slate-400 mr-1 hidden sm:inline">Device:</span>
           <button
             type="button"
             id="btnAutoMode"
             onClick={() => setViewMode('auto')}
-            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer font-medium ${
-              viewMode === 'auto' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            className={`device-btn px-2.5 py-1 rounded text-xs transition cursor-pointer font-medium ${
+              viewMode === 'auto' ? 'bg-blue-600 text-white font-bold active' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
             Auto
           </button>
           <button
             type="button"
-            id="btnDesktopMode"
-            onClick={() => setViewMode('desktop')}
-            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
-              viewMode === 'desktop' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            id="btnLaptop"
+            onClick={() => setViewMode('laptop')}
+            className={`device-btn px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
+              viewMode === 'laptop' || viewMode === 'desktop' ? 'bg-blue-600 text-white font-bold active' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Monitor className="w-3 h-3" />
-            <span>Desktop</span>
+            <Monitor className="w-3.5 h-3.5" />
+            <span>Laptop</span>
           </button>
           <button
             type="button"
-            id="btnMobileMode"
-            onClick={() => setViewMode('mobile')}
-            className={`px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
-              viewMode === 'mobile' ? 'bg-blue-600 text-white font-bold' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            id="btnTablet"
+            onClick={() => setViewMode('tablet')}
+            className={`device-btn px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
+              viewMode === 'tablet' ? 'bg-blue-600 text-white font-bold active' : 'text-slate-300 hover:bg-slate-700'
             }`}
           >
-            <Smartphone className="w-3 h-3" />
+            <Tablet className="w-3.5 h-3.5" />
+            <span>Tablet</span>
+          </button>
+          <button
+            type="button"
+            id="btnMobile"
+            onClick={() => setViewMode('mobile')}
+            className={`device-btn px-2.5 py-1 rounded text-xs transition cursor-pointer flex items-center gap-1 font-medium ${
+              viewMode === 'mobile' ? 'bg-blue-600 text-white font-bold active' : 'text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Smartphone className="w-3.5 h-3.5" />
             <span>Mobile</span>
           </button>
         </div>
       </div>
+
+      {/* 2. Top Brand Header */}
+      <header className="top-brand-header bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 w-10 h-10 rounded-lg shadow-inner flex items-center justify-center text-white shrink-0">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="brand-title flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-lg font-extrabold tracking-wide text-white">
+                INTRIGATED CENTRAL HUB - INDORE
+              </h1>
+              <span className="badge-hub bg-blue-600/25 border border-blue-500/50 text-blue-300 text-xs font-bold px-2 py-0.5 rounded">
+                Dock Operations
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Docks 1 to 9 | Movement, Dispatch & Audit Control
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => downloadSampleCSVTemplate()}
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
+            title="Download 14-Column Sample CSV Template"
+          >
+            <Download className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Sample CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsCSVModalOpen(true)}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-blue-400/30"
+            title="Upload CSV/Excel file to update wrong data"
+          >
+            <UploadCloud className="w-4 h-4" />
+            <span>Upload CSV / Correct Data</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleFetchFromSheet}
+            disabled={isFetchingSheet}
+            className="text-slate-300 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
+            title="Refresh Data from Google Sheet"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetchingSheet ? 'animate-spin text-blue-400' : ''}`} />
+          </button>
+        </div>
+      </header>
+
+      {/* CSV Success Notification Banner */}
+      {csvSuccessMsg && (
+        <div className="bg-emerald-600 text-white px-5 py-2.5 text-xs font-semibold flex items-center justify-between shadow-xs animate-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+            <span>{csvSuccessMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCsvSuccessMsg(null)}
+            className="text-emerald-100 hover:text-white p-1 rounded transition cursor-pointer"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Webhook Configuration Drawer */}
       {showWebhookSettings && (
@@ -638,8 +742,8 @@ function doGet() {
         </div>
       )}
 
-      {/* ================= 2. DESKTOP LAYOUT ================= */}
-      <div className={`desktop-layout flex min-h-[620px] ${viewMode === 'mobile' ? 'hidden' : viewMode === 'desktop' ? 'flex' : 'hidden md:flex'}`}>
+      {/* ================= 2. DESKTOP / LAPTOP LAYOUT ================= */}
+      <div className={`desktop-layout flex min-h-[620px] ${viewMode === 'mobile' || viewMode === 'tablet' ? 'hidden' : viewMode === 'laptop' || viewMode === 'desktop' ? 'flex' : 'hidden md:flex'}`}>
         {/* Sidebar */}
         <aside className="w-60 bg-slate-900 text-white flex flex-col shrink-0 border-r border-slate-800">
           <div className="p-4 border-b border-slate-800 flex items-center gap-2 font-bold text-blue-400 text-sm">
@@ -701,6 +805,16 @@ function doGet() {
               >
                 <ClipboardList className="w-4 h-4" />
                 <span>Log Reports</span>
+              </button>
+            </li>
+            <li className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsCSVModalOpen(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 transition cursor-pointer text-left font-bold text-xs"
+              >
+                <UploadCloud className="w-4 h-4 text-blue-400" />
+                <span>Upload CSV / Correct</span>
               </button>
             </li>
           </ul>
@@ -1219,6 +1333,26 @@ function doGet() {
                       <option value="In Progress">In Progress</option>
                       <option value="Loaded / Unloaded">Loaded / Unloaded</option>
                     </select>
+
+                    <button
+                      type="button"
+                      onClick={() => downloadSampleCSVTemplate()}
+                      className="px-2.5 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                      title="Download 14-Column CSV Template"
+                    >
+                      <Download className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="hidden sm:inline">CSV Template</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCSVModalOpen(true)}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                      title="Upload CSV/Excel to fix or update records"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Upload / Correct CSV</span>
+                    </button>
                   </div>
                 </div>
 
@@ -1288,8 +1422,188 @@ function doGet() {
         </main>
       </div>
 
-      {/* ================= 3. MOBILE LAYOUT ================= */}
-      <div className={`mobile-layout pb-20 ${viewMode === 'desktop' ? 'hidden' : viewMode === 'mobile' ? 'block' : 'block md:hidden'}`}>
+      {/* ================= 3. TABLET VIEW ================= */}
+      <div className={`view-container tablet-view p-4 max-w-5xl mx-auto ${viewMode === 'tablet' ? 'block' : 'hidden'}`} id="tabletView">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Supervisor Quick Tasks */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                <KanbanSquare className="w-4 h-4 text-blue-600" />
+                Supervisor Active Pipeline
+              </h3>
+              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-bold">
+                {mobileFilteredTasks.length} Active
+              </span>
+            </div>
+            <select
+              id="tSupervisorSelector"
+              value={mobileSupervisorFilter}
+              onChange={(e) => setMobileSupervisorFilter(e.target.value)}
+              className="w-full p-2.5 border-2 border-blue-600 rounded-lg text-sm font-bold text-blue-900 bg-white focus:outline-none"
+            >
+              <option value="ALL">-- All Supervisors --</option>
+              <option value="Ankit Dayal">Ankit Dayal</option>
+              <option value="Sanjay Sharma">Sanjay Sharma</option>
+              <option value="Vikas Patel">Vikas Patel</option>
+              <option value="Rahul Verma">Rahul Verma</option>
+              <option value="Amit Kumar">Amit Kumar</option>
+              <option value="Suman Singh">Suman Singh</option>
+            </select>
+            <div id="tSupervisorCardList" className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+              {mobileFilteredTasks.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-400">
+                  No active vehicles assigned to this supervisor.
+                </div>
+              ) : (
+                mobileFilteredTasks.map((task) => {
+                  const isInDock = isInDockStatus(task);
+                  const act = task.activityType || task.operation || 'Loading';
+
+                  return (
+                    <div key={task.id} className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 transition space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
+                            {task.tokenId || task.id}
+                          </span>
+                          <div className="text-sm font-extrabold text-slate-900 font-mono mt-0.5">
+                            {task.vehicleNo}
+                          </div>
+                        </div>
+                        <span className="bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-xs">
+                          {task.binNo || task.gateNo || 'Dock-01'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-600 space-y-0.5">
+                        <div><b>Driver:</b> {task.driverName} {task.driverMobile && `(${task.driverMobile})`}</div>
+                        <div><b>Transporter:</b> {task.transporterName || 'ICRL'} • <b>Purpose:</b> {act}</div>
+                        <div><b>Supervisor:</b> <span className="text-blue-700 font-semibold">{task.supervisorName}</span></div>
+                      </div>
+                      {!isInDock ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenStartModal(task, act as any)}
+                          className="w-full py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Start In-Dock Activity</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleCloseActivityClick(task)}
+                          className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Complete Activity</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Quick Gate In Entry Form */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5 border-b border-slate-100 pb-2">
+              <Shield className="w-4 h-4 text-blue-600" />
+              Quick Gate In
+            </h3>
+            {guardSuccessMsg && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{guardSuccessMsg}</span>
+              </div>
+            )}
+            <form onSubmit={handleGateSubmit} className="space-y-2.5">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
+                <input
+                  type="text"
+                  id="tVehicleNo"
+                  value={vehicleNo}
+                  onChange={(e) => setVehicleNo(e.target.value.toUpperCase())}
+                  placeholder="e.g. MP09 AB 1234"
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs font-mono uppercase focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Driver Mobile*</label>
+                <input
+                  type="tel"
+                  id="tDriverMobile"
+                  value={driverMobile}
+                  onChange={(e) => setDriverMobile(e.target.value)}
+                  placeholder="10-digit mobile"
+                  pattern="[0-9]{10}"
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Purpose*</label>
+                <select
+                  id="tActivityType"
+                  value={activityType}
+                  onChange={(e) => setActivityType(e.target.value as any)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Loading">Loading</option>
+                  <option value="Unloading">Unloading</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Transporter*</label>
+                <select
+                  id="tTransporter"
+                  value={transporter}
+                  onChange={(e) => setTransporter(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="MATA">MATA</option>
+                  <option value="DHTC">DHTC</option>
+                  <option value="ICRL">ICRL</option>
+                  <option value="OPM">OPM</option>
+                  <option value="VARUNA">VARUNA</option>
+                  <option value="FLY GREEN">FLY GREEN</option>
+                  <option value="JEET">JEET</option>
+                  <option value="MCM">MCM</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-700">Assigned Dock (1-9)*</label>
+                <select
+                  id="tBinNo"
+                  value={binNo}
+                  onChange={(e) => setBinNo(e.target.value)}
+                  required
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500"
+                >
+                  {['Dock-01', 'Dock-02', 'Dock-03', 'Dock-04', 'Dock-05', 'Dock-06', 'Dock-07', 'Dock-08', 'Dock-09'].map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs mt-2"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Submit Gate In</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* ================= 4. MOBILE LAYOUT ================= */}
+      <div className={`mobile-layout pb-20 ${viewMode === 'desktop' || viewMode === 'laptop' || viewMode === 'tablet' ? 'hidden' : viewMode === 'mobile' ? 'block' : 'block md:hidden'}`}>
         {/* Mobile Header */}
         <header className="mobile-header bg-slate-900 text-white px-4 py-3 flex justify-between items-center sticky top-0 z-30">
           <h2 className="text-sm font-bold flex items-center gap-2 text-white">
@@ -1725,6 +2039,15 @@ function doGet() {
           </div>
         </div>
       )}
+
+      {/* CSV / Excel Data Upload & Correction Modal */}
+      <CSVImportModal
+        isOpen={isCSVModalOpen}
+        onClose={() => setIsCSVModalOpen(false)}
+        existingRecords={records}
+        onApplyImport={handleApplyCSVImport}
+        lang={lang}
+      />
     </div>
   );
 };
