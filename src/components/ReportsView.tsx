@@ -438,9 +438,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             >
               <option value="ALL">All (AHPL & AIL)</option>
-              <option value="AHPL">AHPL (Docks 1-4)</option>
-              <option value="AIL">AIL (Docks 5-9)</option>
-              <option value="AHPL & AIL">Joint AHPL & AIL</option>
+              <option value="AHPL">AHPL (Docks 01-04)</option>
+              <option value="AIL">AIL (Docks 05-09)</option>
             </select>
           </div>
 

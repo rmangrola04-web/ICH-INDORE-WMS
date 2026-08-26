@@ -109,9 +109,6 @@ export const EntryForm: React.FC<EntryFormProps> = ({ lang, onAddRecord }) => {
             >
               <option value="AHPL">AHPL</option>
               <option value="AIL">AIL</option>
-              <option value="AHPL & AIL">
-                AHPL & AIL {lang === 'hi' ? '(संयुक्त)' : '(Joint)'}
-              </option>
             </select>
           </div>
         </div>

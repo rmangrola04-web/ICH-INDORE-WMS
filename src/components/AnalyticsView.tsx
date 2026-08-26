@@ -41,15 +41,15 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ records, lang }) =
 
   // 1. Average TAT by Dock
   const dockDataMap: Record<string, { gate: string; totalMins: number; count: number }> = {
-    'Dock 1': { gate: 'Dock 1 (AHPL)', totalMins: 0, count: 0 },
-    'Dock 2': { gate: 'Dock 2 (AHPL)', totalMins: 0, count: 0 },
-    'Dock 3': { gate: 'Dock 3 (AHPL)', totalMins: 0, count: 0 },
-    'Dock 4': { gate: 'Dock 4 (AHPL)', totalMins: 0, count: 0 },
-    'Dock 5': { gate: 'Dock 5 (AIL)', totalMins: 0, count: 0 },
-    'Dock 6': { gate: 'Dock 6 (AIL)', totalMins: 0, count: 0 },
-    'Dock 7': { gate: 'Dock 7 (AIL)', totalMins: 0, count: 0 },
-    'Dock 8': { gate: 'Dock 8 (AIL)', totalMins: 0, count: 0 },
-    'Dock 9': { gate: 'Dock 9 (AIL)', totalMins: 0, count: 0 },
+    'Dock 01': { gate: 'Dock 01 (AHPL)', totalMins: 0, count: 0 },
+    'Dock 02': { gate: 'Dock 02 (AHPL)', totalMins: 0, count: 0 },
+    'Dock 03': { gate: 'Dock 03 (AHPL)', totalMins: 0, count: 0 },
+    'Dock 04': { gate: 'Dock 04 (AHPL)', totalMins: 0, count: 0 },
+    'Dock 05': { gate: 'Dock 05 (AIL)', totalMins: 0, count: 0 },
+    'Dock 06': { gate: 'Dock 06 (AIL)', totalMins: 0, count: 0 },
+    'Dock 07': { gate: 'Dock 07 (AIL)', totalMins: 0, count: 0 },
+    'Dock 08': { gate: 'Dock 08 (AIL)', totalMins: 0, count: 0 },
+    'Dock 09': { gate: 'Dock 09 (AIL)', totalMins: 0, count: 0 },
   };
 
   records.forEach((r) => {
@@ -59,11 +59,13 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ records, lang }) =
       let diff = eh * 60 + em - (sh * 60 + sm);
       if (diff < 0) diff += 24 * 60;
 
-      for (const key of Object.keys(dockDataMap)) {
-        if (r.gateNo.toLowerCase().includes(key.toLowerCase())) {
-          dockDataMap[key].totalMins += diff;
-          dockDataMap[key].count += 1;
-          break;
+      const dockStr = (r.gateNo || r.binNo || '').trim();
+      const numMatch = dockStr.match(/\d+/);
+      if (numMatch) {
+        const paddedKey = `Dock ${numMatch[0].padStart(2, '0')}`;
+        if (dockDataMap[paddedKey]) {
+          dockDataMap[paddedKey].totalMins += diff;
+          dockDataMap[paddedKey].count += 1;
         }
       }
     }

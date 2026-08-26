@@ -11,7 +11,7 @@ import {
   DoorOpen,
   Warehouse,
 } from 'lucide-react';
-import { DockRecord, Language } from '../types';
+import { DockRecord, Language, AHPL_DOCKS, AIL_DOCKS, ALL_DOCKS } from '../types';
 import { t } from '../utils/translations';
 
 interface LiveActivityViewProps {
@@ -21,9 +21,6 @@ interface LiveActivityViewProps {
   onAssignGate: (gateNo: string) => void;
   onEditRecord: (record: DockRecord) => void;
 }
-
-const AHPL_DOCKS = ['Dock 1', 'Dock 2', 'Dock 3', 'Dock 4'];
-const AIL_DOCKS = ['Dock 5', 'Dock 6', 'Dock 7', 'Dock 8', 'Dock 9'];
 
 export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
   records,
@@ -86,23 +83,34 @@ export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
     }
   };
 
+  // Helper to normalize dock name for matching (e.g. 'Dock 01', 'Dock 1', 'Dock-01' -> 'dock01')
+  const normalizeDock = (d?: string) => {
+    if (!d) return '';
+    const numMatch = d.match(/\d+/);
+    if (numMatch) {
+      return `dock${numMatch[0].padStart(2, '0')}`;
+    }
+    return d.toLowerCase().replace(/[\s-_]/g, '');
+  };
+
   // Find active or latest record for a given dock name
   const getDockStatus = (dockName: string) => {
+    const targetNorm = normalizeDock(dockName);
     // 1. Look for In-Progress record
     const inProgress = records.find(
-      (r) => r.gateNo.toLowerCase().trim() === dockName.toLowerCase().trim() && r.status === 'In-Progress'
+      (r) => (normalizeDock(r.gateNo) === targetNorm || normalizeDock(r.binNo) === targetNorm) && r.status === 'In-Progress'
     );
     if (inProgress) return { state: 'in-progress' as const, record: inProgress };
 
     // 2. Look for Gate-In Waiting record
     const waiting = records.find(
-      (r) => r.gateNo.toLowerCase().trim() === dockName.toLowerCase().trim() && r.status === 'Gate-In Waiting'
+      (r) => (normalizeDock(r.gateNo) === targetNorm || normalizeDock(r.binNo) === targetNorm) && r.status === 'Gate-In Waiting'
     );
     if (waiting) return { state: 'waiting' as const, record: waiting };
 
     // 3. Look for most recent completed record
     const completed = records.find(
-      (r) => r.gateNo.toLowerCase().trim() === dockName.toLowerCase().trim() && r.status === 'Completed'
+      (r) => (normalizeDock(r.gateNo) === targetNorm || normalizeDock(r.binNo) === targetNorm) && r.status === 'Completed'
     );
     if (completed) return { state: 'completed' as const, record: completed };
 
@@ -386,7 +394,7 @@ export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
           </div>
         </div>
 
-        {/* Section 1: AHPL Dedicated Bays (Docks 1 – 4) */}
+        {/* Section 1: AHPL Dedicated Bays (Docks 01 – 04) */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -394,7 +402,7 @@ export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
                 AHPL
               </span>
               <h3 className="text-sm font-bold text-slate-800">
-                AHPL Dedicated Bays (Docks 1 – 4)
+                AHPL Dedicated Bays (Docks 01 – 04)
               </h3>
             </div>
             <span className="text-xs text-slate-500 font-medium">
@@ -406,7 +414,7 @@ export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
           </div>
         </div>
 
-        {/* Section 2: AIL Dedicated Bays (Docks 5 – 9) */}
+        {/* Section 2: AIL Dedicated Bays (Docks 05 – 09) */}
         <div className="pt-4 border-t border-slate-100">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -414,7 +422,7 @@ export const LiveActivityView: React.FC<LiveActivityViewProps> = ({
                 AIL
               </span>
               <h3 className="text-sm font-bold text-slate-800">
-                AIL Dedicated Bays (Docks 5 – 9)
+                AIL Dedicated Bays (Docks 05 – 09)
               </h3>
             </div>
             <span className="text-xs text-slate-500 font-medium">

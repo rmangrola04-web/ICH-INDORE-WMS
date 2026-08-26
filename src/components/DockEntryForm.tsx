@@ -11,24 +11,16 @@ import {
   PodStatus,
   AttachedDocument,
   SUPERVISOR_ROSTER,
+  AHPL_DOCKS,
+  AIL_DOCKS,
+  ALL_DOCKS,
+  getDocksForCompany,
 } from '../types';
 
 interface DockEntryFormProps {
   lang: Language;
   onAddDockRecord: (record: Omit<DockRecord, 'id' | 'date'>) => void;
 }
-
-const ALL_DOCKS = [
-  'Dock 1',
-  'Dock 2',
-  'Dock 3',
-  'Dock 4',
-  'Dock 5',
-  'Dock 6',
-  'Dock 7',
-  'Dock 8',
-  'Dock 9',
-];
 
 const VEHICLE_TYPES = [
   '32 Ft Single Axle (SXL)',
@@ -69,12 +61,12 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
     });
   };
 
-  const [companyUnit, setCompanyUnit] = useState<CompanyUnit>('AHPL');
-  const [assignedDock, setAssignedDock] = useState<string>('Dock 1');
+  const [companyUnit, setCompanyUnit] = useState<CompanyUnit | ''>('AHPL');
+  const [assignedDock, setAssignedDock] = useState<string>('Dock 01');
   const [operation, setOperation] = useState<DockOperation>('Loading');
   const [vehicleType, setVehicleType] = useState<VehicleType>('32 Ft Single Axle (SXL)');
   const [transporter, setTransporter] = useState<TransporterName>('ICRL');
-  const [supervisor, setSupervisor] = useState<string>('Suman Singh');
+  const [supervisor, setSupervisor] = useState<string>(SUPERVISOR_ROSTER[0]);
   const [vehicleNo, setVehicleNo] = useState<string>('');
   const [sealNo, setSealNo] = useState<string>('');
   const [location, setLocation] = useState<string>('');
@@ -85,6 +77,20 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic Docks for Company
+  const availableDocks = companyUnit ? getDocksForCompany(companyUnit) : [];
+
+  const handleCompanyChange = (newCompany: CompanyUnit | '') => {
+    setCompanyUnit(newCompany);
+    if (newCompany === 'AHPL') {
+      setAssignedDock('Dock 01');
+    } else if (newCompany === 'AIL') {
+      setAssignedDock('Dock 05');
+    } else {
+      setAssignedDock('');
+    }
+  };
 
   const setCurrentTime = (targetField: 'inpStartTime' | 'inpExitTime') => {
     const timeStr = getFormattedCurrentTime();
@@ -113,7 +119,7 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vehicleNo.trim() || !sealNo.trim() || !location.trim() || !startTime.trim()) return;
+    if (!companyUnit || !assignedDock || !vehicleNo.trim() || !sealNo.trim() || !location.trim() || !startTime.trim()) return;
 
     const unitMapped: CompanyUnit = companyUnit === 'AIL' ? 'AIL' : 'AHPL';
     const statusMapped: DockStatus = exitTime.trim() ? 'Completed' : 'In-Progress';
@@ -151,11 +157,11 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
 
   const handleReset = () => {
     setCompanyUnit('AHPL');
-    setAssignedDock('Dock 1');
+    setAssignedDock('Dock 01');
     setOperation('Loading');
     setVehicleType('32 Ft Single Axle (SXL)');
     setTransporter('ICRL');
-    setSupervisor('Suman Singh');
+    setSupervisor(SUPERVISOR_ROSTER[0]);
     setVehicleNo('');
     setSealNo('');
     setLocation('');
@@ -188,19 +194,21 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
 
         {/* Form Container */}
         <form id="dockForm" onSubmit={handleSubmit} className="space-y-4">
-          {/* Row 1: Company / Operating Unit */}
+          {/* Row 1: Company Name */}
           <div className="form-group">
             <label htmlFor="inpCompany" className="block text-xs font-semibold text-slate-700 mb-1">
-              Company / Operating Unit
+              Company Name <span className="text-rose-500">*</span>
             </label>
             <select
               id="inpCompany"
               value={companyUnit}
-              onChange={(e) => setCompanyUnit(e.target.value as CompanyUnit)}
+              onChange={(e) => handleCompanyChange(e.target.value as CompanyUnit)}
+              required
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-slate-800 shadow-2xs"
             >
-              <option value="AHPL">AHPL (Docks 1 to 4)</option>
-              <option value="AIL">AIL (Docks 5 to 9)</option>
+              <option value="">-- Select Company First --</option>
+              <option value="AHPL">AHPL</option>
+              <option value="AIL">AIL</option>
             </select>
           </div>
 
@@ -208,19 +216,27 @@ export const DockEntryForm: React.FC<DockEntryFormProps> = ({ lang, onAddDockRec
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="form-group">
               <label htmlFor="inpAssignedDock" className="block text-xs font-semibold text-slate-700 mb-1">
-                Assigned Dock
+                Assigned Dock (2-digit) <span className="text-rose-500">*</span>
               </label>
               <select
                 id="inpAssignedDock"
                 value={assignedDock}
+                disabled={!companyUnit}
                 onChange={(e) => setAssignedDock(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-slate-800 shadow-2xs"
+                required
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-slate-800 shadow-2xs ${
+                  !companyUnit ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : 'border-slate-300'
+                }`}
               >
-                {ALL_DOCKS.map((dock) => (
-                  <option key={dock} value={dock}>
-                    {dock}
-                  </option>
-                ))}
+                {!companyUnit ? (
+                  <option value="">Select Company First</option>
+                ) : (
+                  availableDocks.map((dock) => (
+                    <option key={dock} value={dock}>
+                      {dock}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <div className="form-group">

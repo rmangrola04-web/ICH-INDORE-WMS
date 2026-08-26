@@ -51,6 +51,22 @@ export const SUPERVISOR_ROSTER = [
 
 export type SupervisorName = typeof SUPERVISOR_ROSTER[number] | string;
 
+export const AHPL_DOCKS = ['Dock 01', 'Dock 02', 'Dock 03', 'Dock 04'] as const;
+export const AIL_DOCKS = ['Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'] as const;
+export const ALL_DOCKS = ['Dock 01', 'Dock 02', 'Dock 03', 'Dock 04', 'Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'] as const;
+
+export function getDocksForCompany(company?: string): readonly string[] {
+  if (!company) return [];
+  const comp = company.toUpperCase();
+  if (comp.includes('AIL')) {
+    return AIL_DOCKS;
+  }
+  if (comp.includes('AHPL') || comp.includes('HPL')) {
+    return AHPL_DOCKS;
+  }
+  return ALL_DOCKS;
+}
+
 export interface AttachedDocument {
   name: string;
   type: string;

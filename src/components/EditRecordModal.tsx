@@ -95,7 +95,6 @@ export const EditRecordModal: React.FC<EditRecordModalProps> = ({
             >
               <option value="AHPL">AHPL</option>
               <option value="AIL">AIL</option>
-              <option value="AHPL & AIL">AHPL & AIL (संयुक्त)</option>
             </select>
           </div>
 

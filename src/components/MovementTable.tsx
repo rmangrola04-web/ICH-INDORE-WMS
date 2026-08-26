@@ -394,7 +394,7 @@ export const MovementTable: React.FC<MovementTableProps> = ({
             <div className="flex items-center gap-1 text-xs">
               <span className="text-slate-500 font-medium hidden sm:inline">{dict.unit}:</span>
               <div className="flex rounded-md border border-slate-300 bg-white p-0.5 shadow-2xs">
-                {(['All', 'AHPL', 'AIL', 'AHPL & AIL'] as const).map((u) => (
+                {(['All', 'AHPL', 'AIL'] as const).map((u) => (
                   <button
                     key={u}
                     type="button"
@@ -405,7 +405,7 @@ export const MovementTable: React.FC<MovementTableProps> = ({
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    {u === 'All' ? dict.filterAll : u === 'AHPL & AIL' ? 'संयुक्त' : u}
+                    {u === 'All' ? dict.filterAll : u}
                   </button>
                 ))}
               </div>

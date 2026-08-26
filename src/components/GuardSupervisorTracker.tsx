@@ -39,7 +39,16 @@ import {
   Download,
   X
 } from 'lucide-react';
-import { DockRecord, CompanyUnit, SUPERVISOR_ROSTER, Language } from '../types';
+import {
+  DockRecord,
+  CompanyUnit,
+  SUPERVISOR_ROSTER,
+  Language,
+  AHPL_DOCKS,
+  AIL_DOCKS,
+  ALL_DOCKS,
+  getDocksForCompany,
+} from '../types';
 import { CSVImportModal } from './CSVImportModal';
 import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
 import { COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS } from '../utils/googleSheetsService';
@@ -110,16 +119,30 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [otherTransporter, setOtherTransporter] = useState('');
   const [locationType, setLocationType] = useState<string>('LL');
   const [cfaLocation, setCfaLocation] = useState('');
-  const [binNo, setBinNo] = useState('Dock-01');
+  const [binNo, setBinNo] = useState('Dock 01');
   const [supervisor, setSupervisor] = useState(SUPERVISOR_ROSTER[0]);
-  const [unit, setUnit] = useState<CompanyUnit>('AHPL');
+  const [unit, setUnit] = useState<CompanyUnit | ''>('AHPL');
   const [guardSuccessMsg, setGuardSuccessMsg] = useState<string | null>(null);
+
+  // Dynamic Docks for Company
+  const availableGateDocks = unit ? getDocksForCompany(unit) : [];
+
+  const handleUnitChange = (newUnit: CompanyUnit | '') => {
+    setUnit(newUnit);
+    if (newUnit === 'AHPL') {
+      setBinNo('Dock 01');
+    } else if (newUnit === 'AIL') {
+      setBinNo('Dock 05');
+    } else {
+      setBinNo('');
+    }
+  };
 
   // Supervisor Action Modal / Selection
   const [selectedTokenToStart, setSelectedTokenToStart] = useState<DockRecord | null>(null);
   const [chosenActivity, setChosenActivity] = useState<'Loading' | 'Unloading'>('Loading');
   const [chosenSupervisor, setChosenSupervisor] = useState<string>(SUPERVISOR_ROSTER[0]);
-  const [chosenGate, setChosenGate] = useState<string>('Dock-01');
+  const [chosenGate, setChosenGate] = useState<string>('Dock 01');
 
   // Apps Script Webhook integration settings
   const [appsScriptUrl, setAppsScriptUrl] = useState<string>(() => {
@@ -236,27 +259,31 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
             resolvedStatus = 'Dock Assigned';
           }
 
+          const rawUnit = (item.unit || item.Unit || item.company || '').toUpperCase();
+          const resolvedUnit: CompanyUnit = rawUnit.includes('AIL') ? 'AIL' : 'AHPL';
+          const defaultDock = resolvedUnit === 'AIL' ? 'Dock 05' : 'Dock 01';
+
           return {
-            id: `SHEET-${item.tokenId || idx}`,
-            tokenId: item.tokenId || `TKN-${idx + 1000}`,
-            unit: 'AHPL' as CompanyUnit,
-            gateNo: item.binNo || (resolvedActivity === 'Unloading' ? 'Dock-05' : 'Dock-01'),
-            binNo: item.binNo || '',
+            id: item.id || `SHEET-${item.tokenId || item.TokenId || idx}`,
+            tokenId: item.tokenId || item.TokenId || `TKN-${idx + 1000}`,
+            unit: resolvedUnit,
+            gateNo: item.binNo || item.dock || item.gateNo || defaultDock,
+            binNo: item.binNo || item.dock || item.gateNo || '',
             operation: resolvedActivity,
             activityType: resolvedActivity,
-            vehicleNo: item.vehicleNo || 'UNKNOWN',
-            driverName: item.driverName || 'Driver',
-            driverMobile: item.driverMobile || '',
-            transporterName: item.transporter || 'ICRL',
-            locationType: item.locationType || 'LL',
-            cfaLocation: item.cfaLocation || '',
-            supervisorName: item.supervisor || 'Supervisor In-Charge',
-            inTime: item.inTime || '',
-            startTime: item.startTime || '',
-            exitTime: item.closeTime || '',
+            vehicleNo: (item.vehicleNo || item.VehicleNo || '').toUpperCase(),
+            driverName: item.driverName || item.DriverName || '',
+            driverMobile: item.driverMobile || item.DriverMobile || '',
+            transporterName: item.transporter || item.Transporter || 'MATA',
+            locationType: item.locationType || item.LocationType || 'LL',
+            cfaLocation: item.cfaLocation || item.CFALocation || '',
+            supervisorName: item.supervisor || item.Supervisor || SUPERVISOR_ROSTER[0],
+            inTime: item.inTime || item.InTime || '',
+            startTime: item.startTime || item.InDockTime || '',
+            exitTime: item.closeTime || item.ExitTime || '',
             status: resolvedStatus as any,
             date: item.inTime ? item.inTime.split(' ')[0] : new Date().toISOString().slice(0, 10),
-            podStatus: 'POD Clean',
+            podStatus: item.podStatus || 'POD Clean',
             remarks: `Synced from Google Sheet (${item.status || 'Active'})`,
           };
         });
@@ -287,6 +314,9 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       selectedTransporter = 'MATA';
     }
 
+    const defaultDock = unit === 'AIL' ? 'Dock 05' : 'Dock 01';
+    const resolvedDock = binNo.trim() || defaultDock;
+
     const payload = {
       action: 'SECURITY_ENTRY',
       vehicleNo: vehicleNo.trim().toUpperCase(),
@@ -294,9 +324,10 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       driverMobile: driverMobile.trim(),
       activityType: (activityType as 'Loading' | 'Unloading') || 'Loading',
       transporter: selectedTransporter,
+      unit: unit || 'AHPL',
       locationType: locationType || 'LL',
       cfaLocation: cfaLocation.trim(),
-      binNo: binNo.trim() || 'Dock-01',
+      binNo: resolvedDock,
       supervisor: supervisor.trim() || SUPERVISOR_ROSTER[0],
     };
 
@@ -307,10 +338,11 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       driverName: payload.driverName,
       driverMobile: payload.driverMobile,
       transporterName: payload.transporter,
-      unit,
+      unit: (unit as CompanyUnit) || 'AHPL',
       locationType: payload.locationType,
       cfaLocation: payload.cfaLocation,
       binNo: payload.binNo,
+      gateNo: payload.binNo,
       supervisor: payload.supervisor,
       tokenId: generatedToken,
       activityType: payload.activityType,
@@ -349,7 +381,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
     setOtherTransporter('');
     setLocationType('LL');
     setCfaLocation('');
-    setBinNo('Dock-01');
+    setBinNo(unit === 'AIL' ? 'Dock 05' : 'Dock 01');
     setSupervisor(SUPERVISOR_ROSTER[0]);
     setTimeout(() => setGuardSuccessMsg(null), 4500);
   };
@@ -358,7 +390,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const handleOpenStartModal = (record: DockRecord, type: 'Loading' | 'Unloading') => {
     setSelectedTokenToStart(record);
     setChosenActivity(type);
-    setChosenGate(record.binNo || record.gateNo || 'Dock-01');
+    const defaultDock = record.unit === 'AIL' ? 'Dock 05' : 'Dock 01';
+    setChosenGate(record.binNo || record.gateNo || defaultDock);
     if (record.supervisorName && record.supervisorName !== 'Pending Assignment') {
       setChosenSupervisor(record.supervisorName);
     }
@@ -893,7 +926,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
 
                   <div id="dLoadingCards" className="space-y-3 flex-1 overflow-y-auto">
                     {loadingPipelineVehicles.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-xs">No active loading vehicles</div>
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium">No active vehicles in dock</div>
                     ) : (
                       loadingPipelineVehicles.map((v) => {
                         const isInDock = isInDockStatus(v);
@@ -911,8 +944,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                             </div>
                             <div className="font-mono font-bold text-slate-900 text-sm">{v.vehicleNo}</div>
                             <div className="text-xs text-slate-600 space-y-0.5">
-                              <div><b>Driver:</b> {v.driverName} ({v.transporterName || 'ICRL'})</div>
-                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock-01'} | <b>Supervisor:</b> {v.supervisorName}</div>
+                              <div><b>Driver:</b> {v.driverName} {v.transporterName ? `(${v.transporterName})` : ''}</div>
+                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock 01'} | <b>Supervisor:</b> {v.supervisorName}</div>
                             </div>
                             {!isInDock ? (
                               <button
@@ -954,7 +987,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
 
                   <div id="dUnloadingCards" className="space-y-3 flex-1 overflow-y-auto">
                     {unloadingPipelineVehicles.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-xs">No active unloading vehicles</div>
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium">No active vehicles in dock</div>
                     ) : (
                       unloadingPipelineVehicles.map((v) => {
                         const isInDock = isInDockStatus(v);
@@ -972,8 +1005,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                             </div>
                             <div className="font-mono font-bold text-slate-900 text-sm">{v.vehicleNo}</div>
                             <div className="text-xs text-slate-600 space-y-0.5">
-                              <div><b>Driver:</b> {v.driverName} ({v.transporterName || 'ICRL'})</div>
-                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock-01'} | <b>Supervisor:</b> {v.supervisorName}</div>
+                              <div><b>Driver:</b> {v.driverName} {v.transporterName ? `(${v.transporterName})` : ''}</div>
+                              <div><b>Dock:</b> {v.binNo || v.gateNo || 'Dock 01'} | <b>Supervisor:</b> {v.supervisorName}</div>
                             </div>
                             {!isInDock ? (
                               <button
@@ -1015,7 +1048,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
 
                   <div id="dCompletedCards" className="space-y-3 flex-1 overflow-y-auto max-h-[500px]">
                     {completedVehicles.length === 0 ? (
-                      <div className="py-12 text-center text-slate-400 text-xs">No completed vehicles today</div>
+                      <div className="py-12 text-center text-slate-400 text-xs font-medium">No active vehicles in dock</div>
                     ) : (
                       completedVehicles.slice(0, 10).map((v) => (
                         <div key={v.id} className="bg-white p-3 rounded-lg border border-slate-200 shadow-2xs space-y-1.5">
@@ -1054,6 +1087,20 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                 <form onSubmit={handleGateSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-700">Company Name*</label>
+                      <select
+                        id="dUnit"
+                        value={unit}
+                        onChange={(e) => handleUnitChange(e.target.value as CompanyUnit)}
+                        required
+                        className="w-full border border-blue-300 rounded-lg p-2 text-sm bg-blue-50/50 font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="AHPL">AHPL</option>
+                        <option value="AIL">AIL</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
                       <input
                         type="text"
@@ -1077,6 +1124,9 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                       />
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">Driver Mobile*</label>
                       <input
@@ -1090,9 +1140,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                         className="w-full border border-slate-300 rounded-lg p-2 text-sm font-mono"
                       />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">Assigned Purpose*</label>
                       <select
@@ -1126,7 +1174,9 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                         <option value="MCM">MCM</option>
                       </select>
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">Location Type*</label>
                       <select
@@ -1142,9 +1192,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                         <option value="Invoice">Invoice</option>
                       </select>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-700">Place / CFA (Optional)</label>
                       <input
@@ -1158,23 +1206,24 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700">Assigned Dock / Bay No*</label>
+                      <label className="text-xs font-bold text-slate-700">
+                        Assigned Dock / Bay No* {unit && <span className="text-blue-600 font-semibold">({unit})</span>}
+                      </label>
                       <select
                         id="dBinNo"
                         value={binNo}
                         onChange={(e) => setBinNo(e.target.value)}
                         required
-                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-mono"
+                        disabled={!unit}
+                        className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-mono disabled:bg-slate-100 disabled:text-slate-400"
                       >
-                        <option value="Dock-01">Dock-01</option>
-                        <option value="Dock-02">Dock-02</option>
-                        <option value="Dock-03">Dock-03</option>
-                        <option value="Dock-04">Dock-04</option>
-                        <option value="Dock-05">Dock-05</option>
-                        <option value="Dock-06">Dock-06</option>
-                        <option value="Dock-07">Dock-07</option>
-                        <option value="Dock-08">Dock-08</option>
-                        <option value="Dock-09">Dock-09</option>
+                        {!unit ? (
+                          <option value="">Select Company First</option>
+                        ) : (
+                          availableGateDocks.map((d) => (
+                            <option key={d} value={d}>{d}</option>
+                          ))
+                        )}
                       </select>
                     </div>
 
@@ -1347,8 +1396,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
             </select>
             <div id="tSupervisorCardList" className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {mobileFilteredTasks.length === 0 ? (
-                <div className="p-8 text-center bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-400">
-                  No active vehicles assigned to this supervisor.
+                <div className="p-8 text-center bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-400 font-medium">
+                  No active vehicles in dock
                 </div>
               ) : (
                 mobileFilteredTasks.map((task) => {
@@ -1366,13 +1415,13 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                             {task.vehicleNo}
                           </div>
                         </div>
-                        <span className="bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-xs">
-                          {task.binNo || task.gateNo || 'Dock-01'}
+                        <span className="bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-xs font-mono">
+                          {task.binNo || task.gateNo || 'Dock 01'}
                         </span>
                       </div>
                       <div className="text-xs text-slate-600 space-y-0.5">
                         <div><b>Driver:</b> {task.driverName} {task.driverMobile && `(${task.driverMobile})`}</div>
-                        <div><b>Transporter:</b> {task.transporterName || 'ICRL'} • <b>Purpose:</b> {act}</div>
+                        <div><b>Transporter:</b> {task.transporterName || 'Transporter'} • <b>Purpose:</b> {act}</div>
                         <div><b>Supervisor:</b> <span className="text-blue-700 font-semibold">{task.supervisorName}</span></div>
                       </div>
                       {!isInDock ? (
@@ -1414,6 +1463,19 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
               </div>
             )}
             <form onSubmit={handleGateSubmit} className="space-y-2.5">
+              <div>
+                <label className="text-xs font-bold text-slate-700">Company Name*</label>
+                <select
+                  id="tUnit"
+                  value={unit}
+                  onChange={(e) => handleUnitChange(e.target.value as CompanyUnit)}
+                  required
+                  className="w-full border border-blue-300 rounded-lg p-2 text-xs bg-blue-50/50 font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="AHPL">AHPL</option>
+                  <option value="AIL">AIL</option>
+                </select>
+              </div>
               <div>
                 <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
                 <input
@@ -1472,17 +1534,24 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-700">Assigned Dock (1-9)*</label>
+                <label className="text-xs font-bold text-slate-700">
+                  Assigned Dock* {unit && <span className="text-blue-600 font-semibold">({unit})</span>}
+                </label>
                 <select
                   id="tBinNo"
                   value={binNo}
                   onChange={(e) => setBinNo(e.target.value)}
                   required
-                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500"
+                  disabled={!unit}
+                  className="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-blue-500 font-mono disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  {['Dock-01', 'Dock-02', 'Dock-03', 'Dock-04', 'Dock-05', 'Dock-06', 'Dock-07', 'Dock-08', 'Dock-09'].map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
+                  {!unit ? (
+                    <option value="">Select Company First</option>
+                  ) : (
+                    availableGateDocks.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))
+                  )}
                 </select>
               </div>
               <button
@@ -1540,8 +1609,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
               {/* Task Cards List */}
               <div id="mSupervisorCardList" className="space-y-3">
                 {mobileFilteredTasks.length === 0 ? (
-                  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-xs text-slate-400">
-                    No pending vehicles assigned to this supervisor.
+                  <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-xs text-slate-400 font-medium">
+                    No active vehicles in dock
                   </div>
                 ) : (
                   mobileFilteredTasks.map((task) => {
@@ -1559,14 +1628,14 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                               {task.vehicleNo}
                             </div>
                           </div>
-                          <span className="m-dock bg-blue-50 text-blue-800 font-bold px-2 py-1 rounded text-xs">
-                            {task.binNo || task.gateNo || 'Dock-01'}
+                          <span className="m-dock bg-blue-50 text-blue-800 font-bold px-2 py-1 rounded text-xs font-mono">
+                            {task.binNo || task.gateNo || 'Dock 01'}
                           </span>
                         </div>
 
                         <div className="m-details text-xs text-slate-600 space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                           <div><b>Driver:</b> {task.driverName} {task.driverMobile && `(${task.driverMobile})`}</div>
-                          <div><b>Transporter:</b> {task.transporterName || 'ICRL'} • <b>Purpose:</b> {act}</div>
+                          <div><b>Transporter:</b> {task.transporterName || 'Transporter'} • <b>Purpose:</b> {act}</div>
                           <div><b>Supervisor:</b> <span className="text-blue-700 font-semibold">{task.supervisorName}</span></div>
                           <div className="text-[10px] text-slate-400">Gate In: {task.inTime || task.startTime || 'Recorded'}</div>
                         </div>
@@ -1613,6 +1682,20 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
               )}
 
               <form onSubmit={handleGateSubmit} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Company Name*</label>
+                  <select
+                    id="mUnit"
+                    value={unit}
+                    onChange={(e) => handleUnitChange(e.target.value as CompanyUnit)}
+                    required
+                    className="w-full border border-blue-300 rounded-lg p-2 text-xs bg-blue-50/50 font-semibold text-blue-900 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="AHPL">AHPL</option>
+                    <option value="AIL">AIL</option>
+                  </select>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-700">Vehicle Number*</label>
                   <input
@@ -1687,19 +1770,24 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-700">Dock / Bay*</label>
+                    <label className="text-xs font-bold text-slate-700">
+                      Dock / Bay* {unit && <span className="text-blue-600 font-semibold">({unit})</span>}
+                    </label>
                     <select
                       id="mBinNo"
                       value={binNo}
                       onChange={(e) => setBinNo(e.target.value)}
                       required
-                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white font-mono"
+                      disabled={!unit}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white font-mono disabled:bg-slate-100 disabled:text-slate-400"
                     >
-                      <option value="Dock-01">Dock-01</option>
-                      <option value="Dock-02">Dock-02</option>
-                      <option value="Dock-03">Dock-03</option>
-                      <option value="Dock-04">Dock-04</option>
-                      <option value="Dock-05">Dock-05</option>
+                      {!unit ? (
+                        <option value="">Select Company First</option>
+                      ) : (
+                        availableGateDocks.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   <div className="space-y-1">
@@ -1854,7 +1942,13 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
               <div>Token: <b className="font-mono text-blue-700">{selectedTokenToStart.tokenId || selectedTokenToStart.id}</b></div>
               <div>Vehicle: <b className="font-mono">{selectedTokenToStart.vehicleNo}</b></div>
-              <div>Driver: <b>{selectedTokenToStart.driverName}</b> ({selectedTokenToStart.transporterName || 'ICRL'})</div>
+              <div>
+                Driver: <b>{selectedTokenToStart.driverName}</b>{' '}
+                {selectedTokenToStart.transporterName ? `(${selectedTokenToStart.transporterName})` : ''}
+              </div>
+              {selectedTokenToStart.unit && (
+                <div>Unit / Company: <b className="text-blue-700">{selectedTokenToStart.unit}</b></div>
+              )}
             </div>
 
             <div className="space-y-3 text-xs">
@@ -1885,14 +1979,18 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="font-bold text-slate-700">Assigned Dock / Bay</label>
-                <input
-                  type="text"
+                <label className="font-bold text-slate-700">
+                  Assigned Dock / Bay {selectedTokenToStart.unit && `(${selectedTokenToStart.unit})`}
+                </label>
+                <select
                   value={chosenGate}
                   onChange={(e) => setChosenGate(e.target.value)}
-                  className="w-full p-2 rounded-lg border border-slate-300 font-mono"
-                  placeholder="Dock-01"
-                />
+                  className="w-full p-2 rounded-lg border border-slate-300 font-mono bg-white"
+                >
+                  {getDocksForCompany(selectedTokenToStart.unit).map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1">

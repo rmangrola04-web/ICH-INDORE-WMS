@@ -67,7 +67,7 @@ export function mapSheetRowToDockRecord(item: any, idx: number): DockRecord {
     id: item.id || `SHEET-${item.tokenId || item.TokenId || idx + 100}`,
     tokenId: item.tokenId || item.TokenId || item.token || `TKN-${idx + 1000}`,
     unit: resolvedUnit,
-    gateNo: item.binNo || item.dock || item.gateNo || item.Dock || (resolvedUnit === 'AIL' ? 'Dock-05' : 'Dock-01'),
+    gateNo: item.binNo || item.dock || item.gateNo || item.Dock || (resolvedUnit === 'AIL' ? 'Dock 05' : 'Dock 01'),
     binNo: item.binNo || item.dock || item.Dock || '',
     operation: resolvedActivity,
     activityType: resolvedActivity,
@@ -147,6 +147,8 @@ export async function addLiveSheetRecord(record: Partial<DockRecord>, customUrl?
   const dateToday = now.toLocaleDateString('en-IN');
   const fullTimestamp = `${dateToday} ${timeStr}`;
 
+  const defaultDock = record.unit === 'AIL' ? 'Dock 05' : 'Dock 01';
+
   const payload = {
     action: 'ADD',
     tokenId: record.tokenId || `TKN-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -159,8 +161,8 @@ export async function addLiveSheetRecord(record: Partial<DockRecord>, customUrl?
     transporter: record.transporterName || 'MATA',
     locationType: record.locationType || 'LL',
     cfaLocation: record.cfaLocation || record.location || '',
-    binNo: record.binNo || record.gateNo || 'Dock-01',
-    dock: record.binNo || record.gateNo || 'Dock-01',
+    binNo: record.binNo || record.gateNo || defaultDock,
+    dock: record.binNo || record.gateNo || defaultDock,
     supervisor: record.supervisorName || 'Suman Singh',
     unit: record.unit || 'AHPL',
     sealNo: record.sealNo || '',

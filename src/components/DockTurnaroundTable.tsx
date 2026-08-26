@@ -184,8 +184,16 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
         }
 
         // Gate Filter
-        if (activeGateFilter !== 'All' && !record.gateNo.includes(activeGateFilter)) {
-          return false;
+        if (activeGateFilter !== 'All') {
+          const matchNum = activeGateFilter.match(/\d+/);
+          const targetNum = matchNum ? parseInt(matchNum[0], 10) : null;
+          const recMatch = (record.gateNo || record.binNo || '').match(/\d+/);
+          const recNum = recMatch ? parseInt(recMatch[0], 10) : null;
+          if (targetNum !== null && recNum !== null) {
+            if (targetNum !== recNum) return false;
+          } else if (!record.gateNo.toLowerCase().includes(activeGateFilter.toLowerCase())) {
+            return false;
+          }
         }
 
         // Status Filter
@@ -548,18 +556,18 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
                 className="bg-white border border-slate-300 text-slate-700 text-xs rounded-md px-2 py-1 focus:outline-none"
               >
                 <option value="All">{dict.filterAll} Docks</option>
-                <optgroup label="AHPL Docks (1–4)">
-                  <option value="Dock 1">Dock 1</option>
-                  <option value="Dock 2">Dock 2</option>
-                  <option value="Dock 3">Dock 3</option>
-                  <option value="Dock 4">Dock 4</option>
+                <optgroup label="AHPL Docks (01–04)">
+                  <option value="Dock 01">Dock 01</option>
+                  <option value="Dock 02">Dock 02</option>
+                  <option value="Dock 03">Dock 03</option>
+                  <option value="Dock 04">Dock 04</option>
                 </optgroup>
-                <optgroup label="AIL Docks (5–9)">
-                  <option value="Dock 5">Dock 5</option>
-                  <option value="Dock 6">Dock 6</option>
-                  <option value="Dock 7">Dock 7</option>
-                  <option value="Dock 8">Dock 8</option>
-                  <option value="Dock 9">Dock 9</option>
+                <optgroup label="AIL Docks (05–09)">
+                  <option value="Dock 05">Dock 05</option>
+                  <option value="Dock 06">Dock 06</option>
+                  <option value="Dock 07">Dock 07</option>
+                  <option value="Dock 08">Dock 08</option>
+                  <option value="Dock 09">Dock 09</option>
                 </optgroup>
               </select>
             </div>
@@ -598,7 +606,7 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
           <div className="flex flex-wrap items-center gap-2 text-xs pt-1 border-t border-slate-200/60">
             <span className="text-slate-500 font-medium">{dict.unit}:</span>
             <div className="flex rounded-md border border-slate-300 bg-white p-0.5 shadow-2xs">
-              {(['All', 'AHPL', 'AIL', 'AHPL & AIL'] as const).map((u) => (
+              {(['All', 'AHPL', 'AIL'] as const).map((u) => (
                 <button
                   key={u}
                   type="button"
@@ -609,7 +617,7 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {u === 'All' ? dict.filterAll : u === 'AHPL & AIL' ? 'संयुक्त' : u}
+                  {u === 'All' ? dict.filterAll : u}
                 </button>
               ))}
             </div>

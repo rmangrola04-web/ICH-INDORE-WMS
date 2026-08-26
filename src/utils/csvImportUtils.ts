@@ -192,7 +192,7 @@ export const extractRowValues = (row: Record<string, any>) => {
     transporterName: transporterName || 'MATA',
     locationType: (locationType || 'LL').toUpperCase(),
     cfaLocation: cfaLocation || '',
-    binNo: binNo ? (binNo.startsWith('Dock') ? binNo : `Dock-${binNo.padStart(2, '0')}`) : 'Dock-01',
+    binNo: binNo ? (binNo.toLowerCase().startsWith('dock') ? binNo : `Dock ${binNo.padStart(2, '0')}`) : (unit === 'AIL' ? 'Dock 05' : 'Dock 01'),
     supervisorName: supervisorName || 'Ankit Dayal',
     inTime,
     inDockTime,

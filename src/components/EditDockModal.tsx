@@ -10,6 +10,10 @@ import {
   PodStatus,
   Language,
   SUPERVISOR_ROSTER,
+  AHPL_DOCKS,
+  AIL_DOCKS,
+  ALL_DOCKS,
+  getDocksForCompany,
 } from '../types';
 import { t } from '../utils/translations';
 
@@ -29,7 +33,7 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
   const dict = t[lang];
 
   const [unit, setUnit] = useState<CompanyUnit>(record.unit);
-  const [gateNo, setGateNo] = useState<string>(record.gateNo);
+  const [gateNo, setGateNo] = useState<string>(record.gateNo || 'Dock 01');
   const [operation, setOperation] = useState<DockOperation>(record.operation);
   const [vehicleNo, setVehicleNo] = useState<string>(record.vehicleNo);
   const [sealNo, setSealNo] = useState<string>(record.sealNo || '');
@@ -45,12 +49,24 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
   const [status, setStatus] = useState<DockStatus>(record.status);
   const [remarks, setRemarks] = useState<string>(record.remarks || '');
 
+  const availableDocks = getDocksForCompany(unit);
+
+  const handleUnitChange = (newUnit: CompanyUnit) => {
+    setUnit(newUnit);
+    if (newUnit === 'AHPL') {
+      setGateNo('Dock 01');
+    } else if (newUnit === 'AIL') {
+      setGateNo('Dock 05');
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({
       ...record,
       unit,
       gateNo,
+      binNo: gateNo,
       operation,
       vehicleNo: vehicleNo.trim().toUpperCase(),
       sealNo: sealNo.trim() ? sealNo.trim().toUpperCase() : undefined,
@@ -112,12 +128,11 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
               </label>
               <select
                 value={unit}
-                onChange={(e) => setUnit(e.target.value as CompanyUnit)}
+                onChange={(e) => handleUnitChange(e.target.value as CompanyUnit)}
                 className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-medium shadow-2xs"
               >
-                <option value="AHPL">AHPL (Docks 1 to 4)</option>
-                <option value="AIL">AIL (Docks 5 to 9)</option>
-                <option value="AHPL & AIL">AHPL & AIL (Joint)</option>
+                <option value="AHPL">AHPL</option>
+                <option value="AIL">AIL</option>
               </select>
             </div>
             <div>
@@ -129,19 +144,11 @@ export const EditDockModal: React.FC<EditDockModalProps> = ({
                 onChange={(e) => setGateNo(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white font-medium shadow-2xs"
               >
-                <optgroup label="AHPL Docks (1–4)">
-                  <option value="Dock 1">Dock 1</option>
-                  <option value="Dock 2">Dock 2</option>
-                  <option value="Dock 3">Dock 3</option>
-                  <option value="Dock 4">Dock 4</option>
-                </optgroup>
-                <optgroup label="AIL Docks (5–9)">
-                  <option value="Dock 5">Dock 5</option>
-                  <option value="Dock 6">Dock 6</option>
-                  <option value="Dock 7">Dock 7</option>
-                  <option value="Dock 8">Dock 8</option>
-                  <option value="Dock 9">Dock 9</option>
-                </optgroup>
+                {availableDocks.map((dock) => (
+                  <option key={dock} value={dock}>
+                    {dock}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

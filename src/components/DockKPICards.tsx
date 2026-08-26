@@ -11,8 +11,8 @@ interface DockKPICardsProps {
 export const DockKPICards: React.FC<DockKPICardsProps> = ({ dockRecords, lang }) => {
   const dict = t[lang];
 
-  // AHPL Docks (1 to 4) active count
-  const ahplDocks = ['Dock 1', 'Dock 2', 'Dock 3', 'Dock 4'];
+  // AHPL Docks (01 to 04) active count
+  const ahplDocks = ['Dock 01', 'Dock 02', 'Dock 03', 'Dock 04'];
   const ahplOccupied = dockRecords.filter(
     (r) =>
       r.status === 'In-Progress' &&
@@ -21,8 +21,8 @@ export const DockKPICards: React.FC<DockKPICardsProps> = ({ dockRecords, lang })
   const ahplActiveCount = ahplOccupied || 2;
   const ahplUtilPct = Math.round((Math.min(ahplActiveCount, 4) / 4) * 100);
 
-  // AIL Docks (5 to 9) active count
-  const ailDocks = ['Dock 5', 'Dock 6', 'Dock 7', 'Dock 8', 'Dock 9'];
+  // AIL Docks (05 to 09) active count
+  const ailDocks = ['Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'];
   const ailOccupied = dockRecords.filter(
     (r) =>
       r.status === 'In-Progress' &&
@@ -47,14 +47,14 @@ export const DockKPICards: React.FC<DockKPICardsProps> = ({ dockRecords, lang })
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* 1. AHPL Docks (1-4) */}
+      {/* 1. AHPL Docks (01-04) */}
       <div
         id="kpi-ahpl-docks"
         className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
       >
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            AHPL Docks (1–4)
+            AHPL Docks (01–04)
           </p>
           <h3 className="text-2xl font-bold text-slate-800 mt-1">
             {ahplActiveCount} / 4 {lang === 'hi' ? 'सक्रिय' : 'Active'}
@@ -69,14 +69,14 @@ export const DockKPICards: React.FC<DockKPICardsProps> = ({ dockRecords, lang })
         </div>
       </div>
 
-      {/* 2. AIL Docks (5-9) */}
+      {/* 2. AIL Docks (05-09) */}
       <div
         id="kpi-ail-docks"
         className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:shadow-md transition-all flex items-center justify-between"
       >
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            AIL Docks (5–9)
+            AIL Docks (05–09)
           </p>
           <h3 className="text-2xl font-bold text-slate-800 mt-1">
             {ailActiveCount} / 5 {lang === 'hi' ? 'सक्रिय' : 'Active'}
