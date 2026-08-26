@@ -1,6 +1,6 @@
 {
   "name": "AHPL & AIL Warehouse & Transport Hub",
-  "description": "INTRIGATED CENTRAL HUB - INDORE: 14-column Dock Management and Transport Hub with live vehicle tracking, multi-device view modes (Laptop, Tablet, Mobile), Apps Script sync, and supervisor audit control.",
+  "description": "INTRIGATED CENTRAL HUB - INDORE: 14-column Dock Management, Daily Plan Execution module, and Transport Hub with live vehicle tracking, multi-device view modes, Apps Script sync, and supervisor audit control.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

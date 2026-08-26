@@ -2,10 +2,45 @@ export type CompanyUnit = 'AHPL' | 'AIL' | 'AHPL & AIL';
 export type MovementType = 'Inbound' | 'Outbound';
 export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
-export type AppTab = 'loading' | 'live' | 'tracker' | 'reports' | 'analytics' | 'movement';
+export type AppTab = 'loading' | 'live' | 'tracker' | 'plan' | 'reports' | 'analytics' | 'movement';
 
 export type DockStatus = 'Completed' | 'In-Progress' | 'Gate-In Waiting' | 'Dock Assigned' | 'In Progress (In Dock)' | 'Loaded' | 'Unloaded';
 export type DockOperation = 'Loading' | 'Unloading';
+
+export type PlanExecutionStatus =
+  | 'Pending'
+  | 'Vehicle Placed'
+  | 'In-Progress'
+  | 'Executed / Dispatched'
+  | 'Cancelled / Hold';
+
+export type DispatchMode =
+  | 'Dedicated Vehicle (FTL / 32ft / 24ft / 14ft / Tata Ace / Bolero)'
+  | 'Air Courier'
+  | 'Surface Courier'
+  | 'Part Load (PTL)'
+  | string;
+
+export interface DailyPlanRecord {
+  id: string;
+  planDate: string; // YYYY-MM-DD or DD/MM/YYYY
+  company: 'AHPL' | 'AIL';
+  destination: string; // Place of Plan Location / Destination (e.g. City/Hub/Depot)
+  transporterName: string; // Assigned Transport / Transporter Name
+  dispatchMode: DispatchMode; // Vehicle Type / Dispatch Mode
+  totalInvoices?: number | string;
+  totalBoxes?: number | string;
+  totalWeight?: number | string;
+  status: PlanExecutionStatus;
+  assignedDock: string; // Dock 01-Dock 04 for AHPL, Dock 05-Dock 09 for AIL
+  awbOrDocketNo?: string; // Remarks / Air Waybill (AWB) / Docket No
+  remarks?: string;
+  vehicleNo?: string;
+  driverName?: string;
+  driverMobile?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 export type VehicleType =
   | '32 Ft Single Axle (SXL)'

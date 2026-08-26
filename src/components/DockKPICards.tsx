@@ -16,34 +16,31 @@ export const DockKPICards: React.FC<DockKPICardsProps> = ({ dockRecords, lang })
   const ahplOccupied = dockRecords.filter(
     (r) =>
       r.status === 'In-Progress' &&
-      (ahplDocks.some((d) => r.gateNo.toLowerCase().includes(d.toLowerCase())) || r.unit === 'AHPL')
+      (ahplDocks.some((d) => (r.gateNo || '').toLowerCase().includes(d.toLowerCase())) || r.unit === 'AHPL')
   ).length;
-  const ahplActiveCount = ahplOccupied || 2;
-  const ahplUtilPct = Math.round((Math.min(ahplActiveCount, 4) / 4) * 100);
+  const ahplActiveCount = ahplOccupied;
+  const ahplUtilPct = ahplActiveCount > 0 ? Math.round((Math.min(ahplActiveCount, 4) / 4) * 100) : 0;
 
   // AIL Docks (05 to 09) active count
   const ailDocks = ['Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'];
   const ailOccupied = dockRecords.filter(
     (r) =>
       r.status === 'In-Progress' &&
-      (ailDocks.some((d) => r.gateNo.toLowerCase().includes(d.toLowerCase())) || r.unit === 'AIL')
+      (ailDocks.some((d) => (r.gateNo || '').toLowerCase().includes(d.toLowerCase())) || r.unit === 'AIL')
   ).length;
-  const ailActiveCount = ailOccupied || 3;
-  const ailUtilPct = Math.round((Math.min(ailActiveCount, 5) / 5) * 100);
+  const ailActiveCount = ailOccupied;
+  const ailUtilPct = ailActiveCount > 0 ? Math.round((Math.min(ailActiveCount, 5) / 5) * 100) : 0;
 
   // POD Metrics
-  const totalWithPod = dockRecords.length || 1;
+  const totalCount = dockRecords.length;
   const podHoldRecords = dockRecords.filter(
     (r) => r.podStatus && r.podStatus.toLowerCase().includes('hold')
   );
-  const podHoldCount = podHoldRecords.length > 0 ? podHoldRecords.length : 2;
+  const podHoldCount = podHoldRecords.length;
   const podCleanCount = dockRecords.filter(
     (r) => !r.podStatus || r.podStatus.toLowerCase().includes('clean')
   ).length;
-  const podCleanRate = Math.min(
-    99,
-    Math.max(85, Math.round(((totalWithPod - podHoldCount) / totalWithPod) * 100)) || 92
-  );
+  const podCleanRate = totalCount > 0 ? Math.round((podCleanCount / totalCount) * 100) : 100;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

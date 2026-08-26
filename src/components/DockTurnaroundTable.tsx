@@ -699,7 +699,15 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 px-4 text-center text-slate-400 text-sm">
-                    <p className="font-medium text-slate-500">{dict.noRecordsFound}</p>
+                    <p className="font-medium text-slate-500">
+                      {records.length === 0
+                        ? lang === 'hi'
+                          ? 'कोई ऑडिट लॉग प्रविष्टि नहीं मिली। ट्रैकिंग शुरू करने के लिए नई मूवमेंट प्रविष्टि सबमिट करें।'
+                          : 'No audit log entries found. Submit a new movement entry to start tracking.'
+                        : lang === 'hi'
+                        ? 'चयनित फ़िल्टर के अनुसार कोई रिकॉर्ड नहीं मिला।'
+                        : 'No records match the active search/filters.'}
+                    </p>
                   </td>
                 </tr>
               ) : (

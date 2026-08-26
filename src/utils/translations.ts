@@ -92,6 +92,7 @@ export const t = {
     tabLoading: 'लोडिंग और ट्रांसपोर्ट लॉग',
     tabLive: 'लाइव एक्टिविटी और डॉक्स',
     tabTracker: 'वाहन मूवमेंट ट्रैकर',
+    tabPlan: 'दैनिक प्लान एग्जीक्यूशन',
     tabReports: 'रिपोर्ट्स और POD स्टेटस',
     tabAnalytics: 'एनालिटिक्स और ग्राफ',
 
@@ -245,6 +246,7 @@ export const t = {
     tabLoading: 'Loading & Transport Log',
     tabLive: 'Live Activity & Docks',
     tabTracker: 'Movement Tracker',
+    tabPlan: 'Daily Plan Execution',
     tabReports: 'Reports & POD Status',
     tabAnalytics: 'Analytics & Graphs',
 

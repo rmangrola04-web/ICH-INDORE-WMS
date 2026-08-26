@@ -185,7 +185,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ records, lang }) =
   const totalCompleted = records.filter((r) => r.status === 'Completed').length;
   const totalClean = podCounts['POD Clean'];
   const podCleanRate = records.length > 0 ? Math.round((totalClean / records.length) * 100) : 100;
-  const slaCompliancePercent = 94; // Target SLA < 90m
+  const completedWithTime = records.filter((r) => r.startTime && r.exitTime);
+  const withinSlaCount = completedWithTime.filter((r) => {
+    const [sh, sm] = r.startTime.split(':').map(Number);
+    const [eh, em] = (r.exitTime || '').split(':').map(Number);
+    let diff = eh * 60 + em - (sh * 60 + sm);
+    if (diff < 0) diff += 24 * 60;
+    return diff <= 90;
+  }).length;
+  const slaCompliancePercent = completedWithTime.length > 0
+    ? Math.round((withinSlaCount / completedWithTime.length) * 100)
+    : 100;
 
   return (
     <div className="space-y-6">

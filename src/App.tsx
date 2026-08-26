@@ -16,7 +16,18 @@ import { LiveActivityView } from './components/LiveActivityView';
 import { ReportsView } from './components/ReportsView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { GuardSupervisorTracker } from './components/GuardSupervisorTracker';
-import { MovementRecord, MovementStatus, DockRecord, DockStatus, AppTab, Language, CompanyUnit } from './types';
+import { DailyPlanExecutionView } from './components/DailyPlanExecutionView';
+import {
+  MovementRecord,
+  MovementStatus,
+  DockRecord,
+  DockStatus,
+  AppTab,
+  Language,
+  CompanyUnit,
+  DailyPlanRecord,
+  PlanExecutionStatus,
+} from './types';
 import { t } from './utils/translations';
 import {
   GOOGLE_SCRIPT_URL,
@@ -27,11 +38,16 @@ import {
   updateLiveSheetRecord,
   deleteLiveSheetRecord,
   bulkDeleteLiveSheetRecords,
+  fetchLiveDailyPlans,
+  addLiveDailyPlan,
+  updateLiveDailyPlan,
+  deleteLiveDailyPlan,
   COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS,
 } from './utils/googleSheetsService';
 
 const LOCAL_STORAGE_KEY = 'ahpl_ail_warehouse_records_v1';
 const LOCAL_STORAGE_DOCK_KEY = 'ahpl_ail_dock_records_v1';
+const LOCAL_STORAGE_PLAN_KEY = 'ahpl_ail_daily_plans_v1';
 const LOCAL_STORAGE_LANG_KEY = 'ahpl_ail_warehouse_lang_v1';
 const LOCAL_STORAGE_TAB_KEY = 'ahpl_ail_active_tab_v2';
 
@@ -42,7 +58,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_TAB_KEY);
-      if (saved && ['loading', 'live', 'tracker', 'reports', 'analytics', 'movement'].includes(saved)) {
+      if (saved && ['loading', 'plan', 'live', 'tracker', 'reports', 'analytics', 'movement'].includes(saved)) {
         return saved as AppTab;
       }
     } catch (e) {
@@ -74,6 +90,19 @@ export default function App() {
       }
     } catch (e) {
       console.warn('Failed to parse local storage dock records', e);
+    }
+    return [];
+  });
+
+  const [dailyPlans, setDailyPlans] = useState<DailyPlanRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_PLAN_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse local storage daily plans', e);
     }
     return [];
   });
@@ -127,6 +156,14 @@ export default function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem(LOCAL_STORAGE_PLAN_KEY, JSON.stringify(dailyPlans));
+    } catch (e) {
+      console.warn('Failed to save daily plans', e);
+    }
+  }, [dailyPlans]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(LOCAL_STORAGE_LANG_KEY, lang);
     } catch (e) {
       console.warn('Failed to save language preference', e);
@@ -141,7 +178,7 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // LIVE SYNC FETCH FUNCTION
+  // LIVE SYNC FETCH FUNCTION (Fetches both Dock Operations & Daily Plans)
   const handleFetchFromGoogleSheet = useCallback(async (silent = false) => {
     const activeUrl = getActiveGoogleScriptUrl();
     if (!activeUrl) {
@@ -159,17 +196,27 @@ export default function App() {
     }
 
     try {
-      const res = await fetchLiveSheetRecords(activeUrl);
-      if (res.success) {
-        setDockRecords(res.records);
-        const timeNow = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-        setLastSyncTime(timeNow);
-        setSyncStatus('success');
-        setSyncMessage(`Synced ${res.records.length} records from Google Sheet at ${timeNow}`);
-      } else {
-        setSyncStatus('error');
-        setSyncMessage(res.error || 'Failed to fetch from Google Sheet.');
+      const [dockRes, planRes] = await Promise.allSettled([
+        fetchLiveSheetRecords(activeUrl),
+        fetchLiveDailyPlans(activeUrl),
+      ]);
+
+      let syncSummary: string[] = [];
+
+      if (dockRes.status === 'fulfilled' && dockRes.value.success) {
+        setDockRecords(dockRes.value.records);
+        syncSummary.push(`${dockRes.value.records.length} dock records`);
       }
+
+      if (planRes.status === 'fulfilled' && planRes.value.success && planRes.value.plans.length > 0) {
+        setDailyPlans(planRes.value.plans);
+        syncSummary.push(`${planRes.value.plans.length} daily plans`);
+      }
+
+      const timeNow = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      setLastSyncTime(timeNow);
+      setSyncStatus('success');
+      setSyncMessage(`Synced ${syncSummary.join(' & ') || 'data'} at ${timeNow}`);
     } catch (err: any) {
       setSyncStatus('error');
       setSyncMessage(err.message || 'Network error while connecting to Google Sheet.');
@@ -185,6 +232,74 @@ export default function App() {
   useEffect(() => {
     handleFetchFromGoogleSheet(true);
   }, [handleFetchFromGoogleSheet]);
+
+  // Daily Plan Handlers
+  const handleAddDailyPlan = (newPlanData: Omit<DailyPlanRecord, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    const newId = `PLAN-${Math.floor(1000 + Math.random() * 9000)}`;
+    const fullPlan: DailyPlanRecord = {
+      ...newPlanData,
+      id: newId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    setDailyPlans((prev) => [fullPlan, ...prev]);
+
+    // Push to Google Sheets in background
+    const activeUrl = getActiveGoogleScriptUrl();
+    if (activeUrl) {
+      addLiveDailyPlan(fullPlan, activeUrl).catch((err) => {
+        console.warn('Background Daily Plan sync error:', err);
+      });
+    }
+  };
+
+  const handleUpdateDailyPlan = (updatedPlan: DailyPlanRecord) => {
+    setDailyPlans((prev) =>
+      prev.map((p) => (p.id === updatedPlan.id ? { ...updatedPlan, updatedAt: new Date().toISOString() } : p))
+    );
+
+    const activeUrl = getActiveGoogleScriptUrl();
+    if (activeUrl) {
+      updateLiveDailyPlan(updatedPlan, activeUrl).catch((err) => {
+        console.warn('Background Daily Plan update error:', err);
+      });
+    }
+  };
+
+  const handleDeleteDailyPlan = (id: string) => {
+    setDailyPlans((prev) => prev.filter((p) => p.id !== id));
+
+    const activeUrl = getActiveGoogleScriptUrl();
+    if (activeUrl) {
+      deleteLiveDailyPlan(id, activeUrl).catch((err) => {
+        console.warn('Background Daily Plan delete error:', err);
+      });
+    }
+  };
+
+  const handleQuickPlanStatusChange = (id: string, newStatus: PlanExecutionStatus) => {
+    let targetPlan: DailyPlanRecord | undefined;
+    setDailyPlans((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          targetPlan = { ...p, status: newStatus, updatedAt: new Date().toISOString() };
+          return targetPlan;
+        }
+        return p;
+      })
+    );
+
+    if (targetPlan) {
+      const activeUrl = getActiveGoogleScriptUrl();
+      if (activeUrl) {
+        updateLiveDailyPlan(targetPlan, activeUrl).catch((err) => {
+          console.warn('Quick Plan status sync error:', err);
+        });
+      }
+    }
+  };
 
   // Movement Handlers
   const handleAddRecord = (newEntry: Omit<MovementRecord, 'id' | 'timestamp' | 'date'>) => {
@@ -586,11 +701,30 @@ export default function App() {
         dockCount={dockRecords.length}
         activeBayCount={activeBayCount}
         movementCount={records.length}
+        planCount={dailyPlans.length}
+        pendingPlanCount={dailyPlans.filter((p) => p.status === 'Pending' || p.status === 'Vehicle Placed').length}
         onOpenStockModal={() => setIsStockModalOpen(true)}
       />
 
       {/* Main Content Areas */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6 flex-1 w-full">
+        {/* TAB: DAILY PLAN EXECUTION */}
+        {activeTab === 'plan' && (
+          <section id="planTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+            <DailyPlanExecutionView
+              plans={dailyPlans}
+              lang={lang}
+              onAddPlan={handleAddDailyPlan}
+              onUpdatePlan={handleUpdateDailyPlan}
+              onDeletePlan={handleDeleteDailyPlan}
+              onQuickStatusChange={handleQuickPlanStatusChange}
+              onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
+              isSyncing={isFetchingSheet}
+              lastSyncTime={lastSyncTime}
+            />
+          </section>
+        )}
+
         {/* TAB 1: LOADING & UNLOADING */}
         {activeTab === 'loading' && (
           <section id="loadingTab" className="tab-content space-y-6 animate-in fade-in duration-150">

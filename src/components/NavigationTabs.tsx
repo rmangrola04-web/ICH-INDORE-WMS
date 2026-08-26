@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, Activity, FileSpreadsheet, BarChart3, Warehouse, PackageCheck } from 'lucide-react';
+import { Truck, Activity, FileSpreadsheet, BarChart3, Warehouse, ClipboardList, PackageCheck } from 'lucide-react';
 import { AppTab, Language } from '../types';
 import { t } from '../utils/translations';
 
@@ -10,6 +10,8 @@ interface NavigationTabsProps {
   dockCount: number;
   activeBayCount: number;
   movementCount: number;
+  planCount?: number;
+  pendingPlanCount?: number;
   onOpenStockModal: () => void;
 }
 
@@ -20,6 +22,8 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
   dockCount,
   activeBayCount,
   movementCount,
+  planCount = 0,
+  pendingPlanCount = 0,
   onOpenStockModal,
 }) => {
   const dict = t[lang];
@@ -30,6 +34,13 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       label: dict.tabLoading,
       icon: <Truck className="w-4 h-4" />,
       badge: `${activeBayCount}/5 In Dock`,
+    },
+    {
+      id: 'plan',
+      label: dict.tabPlan || 'Daily Plan Execution',
+      icon: <ClipboardList className="w-4 h-4" />,
+      badge: planCount > 0 ? (pendingPlanCount > 0 ? `${pendingPlanCount} Pending` : planCount) : undefined,
+      pulse: pendingPlanCount > 0,
     },
     {
       id: 'live',

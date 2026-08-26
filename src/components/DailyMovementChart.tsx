@@ -38,17 +38,7 @@ export const DailyMovementChart: React.FC<DailyMovementChartProps> = ({ lang, re
   // Generate the last 7 days data with dynamic inclusion of records
   const chartData = useMemo<DayData[]>(() => {
     const days: DayData[] = [];
-    const baseDate = new Date('2026-08-25T00:00:00'); // Consistent reference date matching workspace metadata
-
-    // Baseline historical patterns for the 6 previous days (Aug 19 - Aug 24, 2026)
-    const historicalBaselines = [
-      { offset: 6, inCount: 11, outCount: 18, inQty: 2900, outQty: 3800 },
-      { offset: 5, inCount: 16, outCount: 19, inQty: 4100, outQty: 4200 },
-      { offset: 4, inCount: 13, outCount: 24, inQty: 3450, outQty: 5100 },
-      { offset: 3, inCount: 15, outCount: 20, inQty: 3800, outQty: 4600 },
-      { offset: 2, inCount: 18, outCount: 26, inQty: 4600, outQty: 5800 },
-      { offset: 1, inCount: 12, outCount: 21, inQty: 3100, outQty: 4400 },
-    ];
+    const baseDate = new Date();
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date(baseDate);
@@ -77,34 +67,15 @@ export const DailyMovementChart: React.FC<DailyMovementChartProps> = ({ lang, re
       const activeInQty = activeInbound.reduce((acc, curr) => acc + (curr.qty || 0), 0);
       const activeOutQty = activeOutbound.reduce((acc, curr) => acc + (curr.qty || 0), 0);
 
-      if (i === 0) {
-        // Today's stats: base + active records
-        const baseInCount = 14;
-        const baseOutCount = 22;
-        const baseInQty = 3650;
-        const baseOutQty = 4850;
-
-        days.push({
-          dateKey,
-          displayDate,
-          shortDay: dayName,
-          inboundCount: baseInCount + activeInCount,
-          outboundCount: baseOutCount + activeOutCount,
-          inboundQty: baseInQty + activeInQty,
-          outboundQty: baseOutQty + activeOutQty,
-        });
-      } else {
-        const baseline = historicalBaselines.find((b) => b.offset === i);
-        days.push({
-          dateKey,
-          displayDate,
-          shortDay: dayName,
-          inboundCount: (baseline?.inCount || 10) + activeInCount,
-          outboundCount: (baseline?.outCount || 15) + activeOutCount,
-          inboundQty: (baseline?.inQty || 2500) + activeInQty,
-          outboundQty: (baseline?.outQty || 3500) + activeOutQty,
-        });
-      }
+      days.push({
+        dateKey,
+        displayDate,
+        shortDay: dayName,
+        inboundCount: activeInCount,
+        outboundCount: activeOutCount,
+        inboundQty: activeInQty,
+        outboundQty: activeOutQty,
+      });
     }
 
     return days;

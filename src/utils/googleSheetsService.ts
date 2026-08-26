@@ -1,4 +1,4 @@
-import { DockRecord, CompanyUnit } from '../types';
+import { DockRecord, CompanyUnit, DailyPlanRecord, PlanExecutionStatus } from '../types';
 
 /**
  * 100% Live Google Sheets Synchronization Configuration
@@ -27,6 +27,180 @@ export function setActiveGoogleScriptUrl(url: string): void {
     localStorage.setItem(LOCAL_STORAGE_URL_KEY, url.trim());
   } catch (e) {
     console.warn('Could not save script URL', e);
+  }
+}
+
+/**
+ * Helper to map raw Google Sheet row or object to DailyPlanRecord
+ */
+export function mapSheetRowToDailyPlan(item: any, idx: number): DailyPlanRecord {
+  const rawComp = (item.company || item.Company || item.unit || item.Unit || 'AHPL').toUpperCase();
+  const company: 'AHPL' | 'AIL' = rawComp.includes('AIL') ? 'AIL' : 'AHPL';
+  const defaultDock = company === 'AIL' ? 'Dock 05' : 'Dock 01';
+
+  let rawStatus = item.status || item.Status || 'Pending';
+  const validStatuses: PlanExecutionStatus[] = [
+    'Pending',
+    'Vehicle Placed',
+    'In-Progress',
+    'Executed / Dispatched',
+    'Cancelled / Hold',
+  ];
+  let status: PlanExecutionStatus = 'Pending';
+  for (const vs of validStatuses) {
+    if (rawStatus.toLowerCase().includes(vs.toLowerCase()) || vs.toLowerCase().includes(rawStatus.toLowerCase())) {
+      status = vs;
+      break;
+    }
+  }
+
+  return {
+    id: item.id || item.planId || item.PlanId || `PLAN-${idx + 1001}`,
+    planDate: item.planDate || item.date || item.PlanDate || item.Date || new Date().toISOString().slice(0, 10),
+    company: company,
+    destination: item.destination || item.place || item.location || item.Destination || item.Place || '',
+    transporterName: item.transporterName || item.transporter || item.Transporter || 'MATA',
+    dispatchMode: item.dispatchMode || item.vehicleType || item.mode || item.DispatchMode || 'Dedicated Vehicle (FTL / 32ft / 24ft / 14ft / Tata Ace / Bolero)',
+    totalInvoices: item.totalInvoices || item.invoices || item.Invoices || '',
+    totalBoxes: item.totalBoxes || item.boxes || item.Boxes || '',
+    totalWeight: item.totalWeight || item.weight || item.Weight || '',
+    status: status,
+    assignedDock: item.assignedDock || item.dock || item.Dock || defaultDock,
+    awbOrDocketNo: item.awbOrDocketNo || item.awb || item.docketNo || item.AWB || item.DocketNo || '',
+    remarks: item.remarks || item.Remarks || '',
+    vehicleNo: item.vehicleNo || item.VehicleNo || '',
+    driverName: item.driverName || item.DriverName || '',
+    driverMobile: item.driverMobile || item.DriverMobile || '',
+    createdAt: item.createdAt || item.timestamp || '',
+    updatedAt: item.updatedAt || '',
+  };
+}
+
+/**
+ * FETCH all daily plans from Google Sheet
+ */
+export async function fetchLiveDailyPlans(customUrl?: string): Promise<{ success: boolean; plans: DailyPlanRecord[]; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, plans: [], error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  try {
+    const fetchUrl = url.includes('?') 
+      ? `${url}&action=DAILY_PLAN_FETCH&t=${Date.now()}` 
+      : `${url}?action=DAILY_PLAN_FETCH&t=${Date.now()}`;
+    const response = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+    }
+
+    const json = await response.json();
+    let rawList: any[] = [];
+
+    if (json && Array.isArray(json.plans)) {
+      rawList = json.plans;
+    } else if (json && Array.isArray(json.data)) {
+      rawList = json.data;
+    } else if (Array.isArray(json)) {
+      rawList = json;
+    }
+
+    const plans = rawList.map((item, idx) => mapSheetRowToDailyPlan(item, idx));
+    return { success: true, plans };
+  } catch (err: any) {
+    console.error('Fetch Daily Plans failed:', err);
+    return { success: false, plans: [], error: err.message || 'Failed to fetch daily plans from Google Sheet.' };
+  }
+}
+
+/**
+ * ADD a new Daily Plan directly to Google Sheets
+ */
+export async function addLiveDailyPlan(plan: DailyPlanRecord, customUrl?: string): Promise<{ success: boolean; id?: string; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  const payload = {
+    action: 'DAILY_PLAN_ADD',
+    plan: plan,
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true, id: plan.id };
+  } catch (err: any) {
+    console.error('Add Daily Plan to Google Sheet failed:', err);
+    return { success: false, error: err.message || 'Failed to send Daily Plan to Google Sheet.' };
+  }
+}
+
+/**
+ * UPDATE an existing Daily Plan in Google Sheets
+ */
+export async function updateLiveDailyPlan(plan: DailyPlanRecord, customUrl?: string): Promise<{ success: boolean; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  const payload = {
+    action: 'DAILY_PLAN_UPDATE',
+    id: plan.id,
+    plan: plan,
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true };
+  } catch (err: any) {
+    console.error('Update Daily Plan in Google Sheet failed:', err);
+    return { success: false, error: err.message || 'Failed to update Daily Plan in Google Sheet.' };
+  }
+}
+
+/**
+ * DELETE a Daily Plan from Google Sheets
+ */
+export async function deleteLiveDailyPlan(id: string, customUrl?: string): Promise<{ success: boolean; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  const payload = {
+    action: 'DAILY_PLAN_DELETE',
+    id: id,
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true };
+  } catch (err: any) {
+    console.error('Delete Daily Plan from Google Sheet failed:', err);
+    return { success: false, error: err.message || 'Failed to delete Daily Plan from Google Sheet.' };
   }
 }
 
@@ -301,7 +475,9 @@ export async function bulkDeleteLiveSheetRecords(ids: string[], tokenIds?: strin
  */
 export const COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS = `/**
  * Google Apps Script for Logistics & Dock Operations Dashboard
- * Supports 100% Live Synchronization: GET (Fetch), ADD, UPDATE, and DELETE
+ * Supports 100% Live Synchronization:
+ * 1. Gate & Dock Operations (Sheet: Dock_Operations / Active)
+ * 2. Daily Plan Execution (Sheet: Daily_Plan_Execution)
  * Deployed as Web App with access set to "Anyone".
  */
 
@@ -319,8 +495,10 @@ function handleRequest(e, method) {
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getActiveSheet();
-    ensureHeaders(sheet);
+    var dockSheet = getOrCreateSheet(ss, "Dock_Operations");
+    var planSheet = getOrCreateSheet(ss, "Daily_Plan_Execution");
+    ensureHeaders(dockSheet);
+    ensurePlanHeaders(planSheet);
 
     var action = "FETCH";
     var payload = {};
@@ -337,50 +515,76 @@ function handleRequest(e, method) {
       payload = e.parameter;
     }
 
-    // 1. FETCH ALL RECORDS
+    // ==========================================
+    // DAILY PLAN EXECUTION ACTIONS
+    // ==========================================
+    if (action === "DAILY_PLAN_FETCH" || action === "GET_DAILY_PLANS") {
+      var plans = getAllDailyPlans(planSheet);
+      return createJsonResponse({ status: "success", count: plans.length, plans: plans, data: plans });
+    }
+
+    if (action === "DAILY_PLAN_ADD") {
+      var newPlan = insertDailyPlan(planSheet, payload.plan || payload);
+      return createJsonResponse({ status: "success", message: "Daily Plan added successfully", id: newPlan.id, plan: newPlan });
+    }
+
+    if (action === "DAILY_PLAN_UPDATE") {
+      var updatedPlan = updateDailyPlan(planSheet, payload);
+      return createJsonResponse({ status: updatedPlan ? "success" : "not_found", message: updatedPlan ? "Plan updated" : "Plan not found" });
+    }
+
+    if (action === "DAILY_PLAN_DELETE") {
+      var deletedPlan = deleteDailyPlan(planSheet, payload.id || payload.planId);
+      return createJsonResponse({ status: deletedPlan ? "success" : "not_found", message: deletedPlan ? "Plan deleted" : "Plan not found" });
+    }
+
+    // ==========================================
+    // DOCK OPERATIONS ACTIONS
+    // ==========================================
+    // 1. FETCH ALL DOCK RECORDS
     if (action === "FETCH" || action === "GET_ALL" || method === "GET") {
-      var records = getAllRecords(sheet);
+      var records = getAllRecords(dockSheet);
       return createJsonResponse({ status: "success", count: records.length, data: records });
     }
 
     // 2. ADD RECORD / SECURITY ENTRY
     if (action === "ADD" || action === "SECURITY_ENTRY" || action === "ADD_RECORD") {
-      var newRecord = insertRecord(sheet, payload);
+      var newRecord = insertRecord(dockSheet, payload);
       return createJsonResponse({ status: "success", message: "Record added successfully", tokenId: newRecord.tokenId, data: newRecord });
     }
 
     // 3. UPDATE RECORD
     if (action === "UPDATE") {
-      var updated = updateRecord(sheet, payload);
+      var updated = updateRecord(dockSheet, payload);
       return createJsonResponse({ status: updated ? "success" : "not_found", message: updated ? "Record updated successfully" : "Record not found" });
     }
 
     // 4. START IN-DOCK ACTIVITY (Time 2)
     if (action === "START_ACTIVITY") {
-      var started = startActivity(sheet, payload);
+      var started = startActivity(dockSheet, payload);
       return createJsonResponse({ status: started ? "success" : "not_found", message: "Activity started in dock" });
     }
 
     // 5. CLOSE ACTIVITY (Time 3)
     if (action === "CLOSE_ACTIVITY") {
-      var closed = closeActivity(sheet, payload);
+      var closed = closeActivity(dockSheet, payload);
       return createJsonResponse({ status: closed ? "success" : "not_found", message: "Activity closed successfully" });
     }
 
     // 6. DELETE RECORD (Permanent)
     if (action === "DELETE") {
-      var deleted = deleteRecord(sheet, payload.id || payload.tokenId);
+      var deleted = deleteRecord(dockSheet, payload.id || payload.tokenId);
       return createJsonResponse({ status: deleted ? "success" : "not_found", message: deleted ? "Record deleted permanently" : "Record not found" });
     }
 
     // 7. BULK DELETE
     if (action === "BULK_DELETE") {
-      var deletedCount = bulkDelete(sheet, payload.ids || payload.tokenIds || []);
+      var deletedCount = bulkDelete(dockSheet, payload.ids || payload.tokenIds || []);
       return createJsonResponse({ status: "success", count: deletedCount, message: deletedCount + " records deleted" });
     }
 
-    // Default fallback: return all rows
-    var allData = getAllRecords(sheet);
+    // Default fallback
+    var allData = getAllRecords(dockSheet);
     return createJsonResponse({ status: "success", data: allData });
 
   } catch (err) {
@@ -388,6 +592,185 @@ function handleRequest(e, method) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function getOrCreateSheet(ss, sheetName) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    if (sheetName === "Dock_Operations" && ss.getSheets().length > 0) {
+      sheet = ss.getActiveSheet();
+      sheet.setName("Dock_Operations");
+    } else {
+      sheet = ss.insertSheet(sheetName);
+    }
+  }
+  return sheet;
+}
+
+function ensureHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      "Token ID",
+      "Date & In Time",
+      "Vehicle No",
+      "Driver Name",
+      "Driver Mobile",
+      "Purpose / Activity",
+      "Transporter Name",
+      "Location Type",
+      "CFA / Destination",
+      "Dock / Bay",
+      "Supervisor Name",
+      "In Dock Time (T2)",
+      "Exit Time (T3)",
+      "Status",
+      "Seal No",
+      "Invoice / LR No",
+      "Remarks",
+      "Unit"
+    ]);
+    sheet.getRange(1, 1, 1, 18).setFontWeight("bold").setBackground("#1e293b").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  }
+}
+
+function ensurePlanHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow([
+      "Plan ID",
+      "Plan Date",
+      "Company",
+      "Destination / Hub",
+      "Transporter Name",
+      "Dispatch Mode",
+      "Total Invoices",
+      "Total Boxes",
+      "Total Weight (KG)",
+      "Execution Status",
+      "Assigned Dock",
+      "AWB / Docket / Remarks",
+      "Vehicle No",
+      "Driver Name",
+      "Driver Mobile",
+      "Updated At"
+    ]);
+    sheet.getRange(1, 1, 1, 16).setFontWeight("bold").setBackground("#1e3a8a").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  }
+}
+
+function getAllDailyPlans(sheet) {
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) return [];
+
+  var list = [];
+  for (var i = 1; i < rows.length; i++) {
+    var r = rows[i];
+    if (!r[0] && !r[3]) continue;
+
+    list.push({
+      id: String(r[0] || ""),
+      planDate: String(r[1] || ""),
+      company: String(r[2] || "AHPL"),
+      destination: String(r[3] || ""),
+      transporterName: String(r[4] || ""),
+      dispatchMode: String(r[5] || ""),
+      totalInvoices: String(r[6] || ""),
+      totalBoxes: String(r[7] || ""),
+      totalWeight: String(r[8] || ""),
+      status: String(r[9] || "Pending"),
+      assignedDock: String(r[10] || "Dock 01"),
+      awbOrDocketNo: String(r[11] || ""),
+      remarks: String(r[11] || ""),
+      vehicleNo: String(r[12] || ""),
+      driverName: String(r[13] || ""),
+      driverMobile: String(r[14] || ""),
+      updatedAt: String(r[15] || "")
+    });
+  }
+  return list;
+}
+
+function insertDailyPlan(sheet, data) {
+  var now = new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit', hour12: true });
+  var dateToday = new Date().toLocaleDateString("en-IN");
+  var fullTimestamp = dateToday + " " + now;
+
+  var planId = data.id || ("PLAN-" + Math.floor(1000 + Math.random() * 9000));
+  var company = (data.company || "AHPL").toUpperCase();
+  var defaultDock = company === "AIL" ? "Dock 05" : "Dock 01";
+
+  sheet.appendRow([
+    planId,
+    data.planDate || dateToday,
+    company,
+    data.destination || "",
+    data.transporterName || "",
+    data.dispatchMode || "Dedicated Vehicle",
+    data.totalInvoices || "",
+    data.totalBoxes || "",
+    data.totalWeight || "",
+    data.status || "Pending",
+    data.assignedDock || defaultDock,
+    data.awbOrDocketNo || data.remarks || "",
+    data.vehicleNo || "",
+    data.driverName || "",
+    data.driverMobile || "",
+    fullTimestamp
+  ]);
+
+  return {
+    id: planId,
+    planDate: data.planDate || dateToday,
+    company: company,
+    destination: data.destination || "",
+    status: data.status || "Pending"
+  };
+}
+
+function updateDailyPlan(sheet, payload) {
+  var target = payload.id || (payload.plan && payload.plan.id);
+  var plan = payload.plan || payload;
+  var rows = sheet.getDataRange().getValues();
+  var now = new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit', hour12: true });
+  var fullTimestamp = new Date().toLocaleDateString("en-IN") + " " + now;
+
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(target)) {
+      var rowIdx = i + 1;
+      if (plan.planDate) sheet.getRange(rowIdx, 2).setValue(plan.planDate);
+      if (plan.company) sheet.getRange(rowIdx, 3).setValue(plan.company);
+      if (plan.destination) sheet.getRange(rowIdx, 4).setValue(plan.destination);
+      if (plan.transporterName) sheet.getRange(rowIdx, 5).setValue(plan.transporterName);
+      if (plan.dispatchMode) sheet.getRange(rowIdx, 6).setValue(plan.dispatchMode);
+      if (plan.totalInvoices !== undefined) sheet.getRange(rowIdx, 7).setValue(plan.totalInvoices);
+      if (plan.totalBoxes !== undefined) sheet.getRange(rowIdx, 8).setValue(plan.totalBoxes);
+      if (plan.totalWeight !== undefined) sheet.getRange(rowIdx, 9).setValue(plan.totalWeight);
+      if (plan.status) sheet.getRange(rowIdx, 10).setValue(plan.status);
+      if (plan.assignedDock) sheet.getRange(rowIdx, 11).setValue(plan.assignedDock);
+      if (plan.awbOrDocketNo !== undefined || plan.remarks !== undefined) {
+        sheet.getRange(rowIdx, 12).setValue(plan.awbOrDocketNo || plan.remarks || "");
+      }
+      if (plan.vehicleNo !== undefined) sheet.getRange(rowIdx, 13).setValue(plan.vehicleNo);
+      if (plan.driverName !== undefined) sheet.getRange(rowIdx, 14).setValue(plan.driverName);
+      if (plan.driverMobile !== undefined) sheet.getRange(rowIdx, 15).setValue(plan.driverMobile);
+      sheet.getRange(rowIdx, 16).setValue(fullTimestamp);
+      return true;
+    }
+  }
+  return false;
+}
+
+function deleteDailyPlan(sheet, targetId) {
+  if (!targetId) return false;
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(targetId)) {
+      sheet.deleteRow(i + 1);
+      return true;
+    }
+  }
+  return false;
 }
 
 function ensureHeaders(sheet) {

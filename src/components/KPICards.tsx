@@ -28,10 +28,10 @@ export const KPICards: React.FC<KPICardsProps> = ({
   const ahplCount = records.filter((r) => r.unit === 'AHPL').length;
   const ailCount = records.filter((r) => r.unit === 'AIL').length;
 
-  // Base metrics from requirement + dynamic active vehicle counter
-  const totalInboundVehicles = Math.max(14, inboundRecords.length);
-  const totalOutboundChallans = Math.max(22, outboundRecords.length);
-  const currentPendingInbound = inboundPending > 0 ? inboundPending : 2;
+  // Base metrics derived directly and strictly from active records
+  const totalInboundVehicles = inboundRecords.length;
+  const totalOutboundChallans = outboundRecords.length;
+  const currentPendingInbound = inboundPending;
 
   return (
     <div className="space-y-4">
