@@ -1,7 +1,18 @@
 import React from 'react';
-import { Truck, Activity, FileSpreadsheet, BarChart3, Warehouse, ClipboardList, PackageCheck } from 'lucide-react';
+import {
+  Truck,
+  Activity,
+  FileSpreadsheet,
+  BarChart3,
+  Warehouse,
+  ClipboardList,
+  PackageCheck,
+  LayoutDashboard,
+  History,
+} from 'lucide-react';
 import { AppTab, Language } from '../types';
 import { t } from '../utils/translations';
+import { CURRENT_APP_VERSION } from '../data/changelogData';
 
 interface NavigationTabsProps {
   activeTab: AppTab;
@@ -9,7 +20,6 @@ interface NavigationTabsProps {
   lang: Language;
   dockCount: number;
   activeBayCount: number;
-  movementCount: number;
   planCount?: number;
   pendingPlanCount?: number;
   onOpenStockModal: () => void;
@@ -21,7 +31,6 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
   lang,
   dockCount,
   activeBayCount,
-  movementCount,
   planCount = 0,
   pendingPlanCount = 0,
   onOpenStockModal,
@@ -30,10 +39,11 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
 
   const tabs: { id: AppTab; label: string; icon: React.ReactNode; badge?: string | number; pulse?: boolean }[] = [
     {
-      id: 'loading',
-      label: dict.tabLoading,
-      icon: <Truck className="w-4 h-4" />,
-      badge: `${activeBayCount}/5 In Dock`,
+      id: 'executive',
+      label: lang === 'hi' ? 'एग्जीक्यूटिव हब' : 'Executive Hub',
+      icon: <LayoutDashboard className="w-4 h-4" />,
+      badge: 'Live',
+      pulse: true,
     },
     {
       id: 'plan',
@@ -41,6 +51,12 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       icon: <ClipboardList className="w-4 h-4" />,
       badge: planCount > 0 ? (pendingPlanCount > 0 ? `${pendingPlanCount} Pending` : planCount) : undefined,
       pulse: pendingPlanCount > 0,
+    },
+    {
+      id: 'loading',
+      label: dict.tabLoading,
+      icon: <Truck className="w-4 h-4" />,
+      badge: `${activeBayCount}/5 In Dock`,
     },
     {
       id: 'live',
@@ -65,10 +81,10 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       icon: <BarChart3 className="w-4 h-4" />,
     },
     {
-      id: 'movement',
-      label: dict.movementTab,
-      icon: <Warehouse className="w-4 h-4" />,
-      badge: movementCount,
+      id: 'version',
+      label: lang === 'hi' ? 'वर्जन हिस्ट्री' : 'Version History',
+      icon: <History className="w-4 h-4" />,
+      badge: CURRENT_APP_VERSION,
     },
   ];
 

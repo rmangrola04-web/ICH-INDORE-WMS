@@ -3,7 +3,27 @@ export type CompanyPlan = 'AHPL' | 'AIL' | 'Both (AHPL & AIL)';
 export type MovementType = 'Inbound' | 'Outbound';
 export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
-export type AppTab = 'loading' | 'live' | 'tracker' | 'plan' | 'reports' | 'analytics' | 'movement';
+export type AppTab =
+  | 'executive'
+  | 'plan'
+  | 'loading'
+  | 'live'
+  | 'tracker'
+  | 'reports'
+  | 'analytics'
+  | 'version';
+
+export interface ChangelogRelease {
+  version: string;
+  releaseDate: string;
+  type: 'major' | 'feature' | 'patch' | 'sync';
+  typeLabel: string;
+  highlight: string;
+  isCurrentLive?: boolean;
+  features: string[];
+  improvements: string[];
+  bugfixes: string[];
+}
 
 export type DockStatus = 'Completed' | 'In-Progress' | 'Gate-In Waiting' | 'Dock Assigned' | 'In Progress (In Dock)' | 'Loaded' | 'Unloaded';
 export type DockOperation = 'Loading' | 'Unloading';

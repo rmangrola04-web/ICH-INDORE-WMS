@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy, History, Sparkles } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { NavigationTabs } from './components/NavigationTabs';
-import { KPICards } from './components/KPICards';
-import { EntryForm } from './components/EntryForm';
-import { MovementTable } from './components/MovementTable';
+import { ExecutiveHubDashboard } from './components/ExecutiveHubDashboard';
+import { WhatsNewBanner } from './components/WhatsNewBanner';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GatePassModal } from './components/GatePassModal';
 import { StockOverviewModal } from './components/StockOverviewModal';
 import { EditRecordModal } from './components/EditRecordModal';
@@ -17,6 +17,7 @@ import { ReportsView } from './components/ReportsView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { GuardSupervisorTracker } from './components/GuardSupervisorTracker';
 import { DailyPlanExecutionView } from './components/DailyPlanExecutionView';
+import { CURRENT_APP_VERSION } from './data/changelogData';
 import {
   MovementRecord,
   MovementStatus,
@@ -49,8 +50,8 @@ import {
 export { GOOGLE_SCRIPT_URL };
 
 export default function App() {
-  // Navigation State
-  const [activeTab, setActiveTab] = useState<AppTab>('loading');
+  // Navigation State - Defaults to Flagship Executive Hub Dashboard
+  const [activeTab, setActiveTab] = useState<AppTab>('executive');
 
   // State: Initialized strictly to empty arrays (No dummy or mock data on load, strictly network-driven)
   const [records, setRecords] = useState<MovementRecord[]>([]);
@@ -65,6 +66,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [customScriptUrl, setCustomScriptUrl] = useState<string>(() => getActiveGoogleScriptUrl());
   const [isCopiedCode, setIsCopiedCode] = useState<boolean>(false);
+  const [isVersionModalOpen, setIsVersionModalOpen] = useState<boolean>(false);
 
   // Language state (defaults to 'hi')
   const [lang, setLang] = useState<Language>('hi');
@@ -573,7 +575,11 @@ export default function App() {
         lang={lang}
         onToggleLang={handleToggleLang}
         onOpenStockModal={() => setIsStockModalOpen(true)}
+        onOpenVersionModal={() => setIsVersionModalOpen(true)}
       />
+
+      {/* Dynamic Update Notification (What's New Banner) */}
+      <WhatsNewBanner onOpenChangelog={() => setIsVersionModalOpen(true)} lang={lang} />
 
       {/* Live Google Sheets Sync Status Bar */}
       <div className="bg-slate-900 border-b border-slate-800 text-white px-4 py-2 text-xs">
@@ -626,7 +632,6 @@ export default function App() {
         lang={lang}
         dockCount={dockRecords.length}
         activeBayCount={activeBayCount}
-        movementCount={records.length}
         planCount={dailyPlans.length}
         pendingPlanCount={dailyPlans.filter((p) => p.status === 'Pending' || p.status === 'Vehicle Placed').length}
         onOpenStockModal={() => setIsStockModalOpen(true)}
@@ -634,6 +639,20 @@ export default function App() {
 
       {/* Main Content Areas */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6 flex-1 w-full">
+        {/* TAB 0: EXECUTIVE HUB DASHBOARD (CENTRAL OPERATIONS OVERVIEW) */}
+        {activeTab === 'executive' && (
+          <section id="executiveTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+            <ExecutiveHubDashboard
+              dockRecords={dockRecords}
+              dailyPlans={dailyPlans}
+              lang={lang}
+              onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
+              isSyncing={isFetchingSheet}
+              lastSyncTime={lastSyncTime}
+            />
+          </section>
+        )}
+
         {/* TAB: DAILY PLAN EXECUTION */}
         {activeTab === 'plan' && (
           <section id="planTab" className="tab-content space-y-6 animate-in fade-in duration-150">
@@ -731,36 +750,53 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB 5: WAREHOUSE SKU MOVEMENTS & INVENTORY */}
-        {activeTab === 'movement' && (
-          <section id="movementTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <KPICards
-              lang={lang}
-              records={records}
-              onFilterUnit={(unit) => setActiveUnitFilter(unit)}
-              onFilterType={(type) => setActiveTypeFilter(type)}
-            />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <div className="lg:col-span-1">
-                <EntryForm lang={lang} onAddRecord={handleAddRecord} />
+        {/* TAB 5: VERSION HISTORY & CHANGELOG */}
+        {activeTab === 'version' && (
+          <section id="versionTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                    <History className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900">
+                      {lang === 'hi' ? 'सिस्टम वर्जन एवं अपग्रेड हिस्ट्री' : 'System Version & Changelog'}
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      {lang === 'hi'
+                        ? 'इंटीग्रेटेड सेंट्रल हब - इंदौर के सभी रिलीज और नई सुविधाएं'
+                        : 'Integrated Central Hub Indore continuous release history'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsVersionModalOpen(true)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{lang === 'hi' ? 'डिटेल्ड मोडल खोलें' : 'Open Detailed View'}</span>
+                </button>
               </div>
 
-              <div className="lg:col-span-2">
-                <MovementTable
-                  lang={lang}
-                  records={records}
-                  activeUnitFilter={activeUnitFilter}
-                  setActiveUnitFilter={setActiveUnitFilter}
-                  activeTypeFilter={activeTypeFilter}
-                  setActiveTypeFilter={setActiveTypeFilter}
-                  onUpdateStatus={handleUpdateStatus}
-                  onBulkUpdateStatus={handleBulkUpdateStatus}
-                  onDeleteRecord={handleDeleteRecord}
-                  onBulkDelete={handleBulkDelete}
-                  onEditRecord={(rec) => setEditingRecord(rec)}
-                  onViewGatePass={(rec) => setSelectedGatePassRecord(rec)}
-                />
+              {/* Directly trigger the rich modal view or open */}
+              <div className="py-8 text-center space-y-3">
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {CURRENT_APP_VERSION} • Production Live Release
+                </span>
+                <p className="text-sm text-slate-600 max-w-md mx-auto">
+                  {lang === 'hi'
+                    ? 'सभी वर्जन, नई सुविधाएं (Features), लॉजिक सुधार (Improvements), और बग फिक्स (Bug Fixes) देखने के लिए नीचे दिए गए बटन पर क्लिक करें।'
+                    : 'Click below to explore the release timeline, feature notes, logic updates, and bug fixes.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsVersionModalOpen(true)}
+                  className="mt-2 px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-sm transition cursor-pointer shadow-md"
+                >
+                  {lang === 'hi' ? 'फुल टाइमलाइन देखें' : 'View Full Release Timeline'}
+                </button>
               </div>
             </div>
           </section>
@@ -769,12 +805,23 @@ export default function App() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            © {new Date().getFullYear()} <strong>AHPL & AIL</strong> - Warehouse & Logistics Hub. All rights reserved.
-          </span>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span>
+              © {new Date().getFullYear()} <strong>AHPL & AIL</strong> - Integrated Central Hub Indore. All rights reserved.
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsVersionModalOpen(true)}
+              className="inline-flex items-center gap-1 font-mono font-bold text-[11px] bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-300 transition cursor-pointer"
+              title="View Version History & Release Notes"
+            >
+              <History className="w-3 h-3 text-indigo-500" />
+              <span>{CURRENT_APP_VERSION} • Live</span>
+            </button>
+          </div>
           <span className="font-mono text-slate-400">
-            100% Live Google Sheets Backend • CRUD Synced
+            100% Live Google Sheets Backend • Zero Mock Data
           </span>
         </div>
       </footer>
@@ -889,6 +936,13 @@ export default function App() {
           onSave={handleSaveEditedDockRecord}
         />
       )}
+
+      {/* Version History & Changelog Modal */}
+      <VersionHistoryModal
+        isOpen={isVersionModalOpen}
+        onClose={() => setIsVersionModalOpen(false)}
+        lang={lang}
+      />
     </div>
   );
 }

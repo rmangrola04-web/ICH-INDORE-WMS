@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Warehouse, Globe, PackageCheck, ShieldCheck, Download, Github, Code } from 'lucide-react';
+import { Warehouse, Globe, PackageCheck, ShieldCheck, Download, Github, Code, History, Sparkles } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../utils/translations';
 import { downloadStandaloneAppHTML } from '../utils/exportUtils';
+import { CURRENT_APP_VERSION } from '../data/changelogData';
 
 interface NavbarProps {
   lang: Language;
   onToggleLang: () => void;
   onOpenStockModal: () => void;
+  onOpenVersionModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   lang,
   onToggleLang,
   onOpenStockModal,
+  onOpenVersionModal,
 }) => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
@@ -57,20 +60,41 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-lg lg:text-xl font-extrabold tracking-wide text-white">
-                INTRIGATED CENTRAL HUB - INDORE
+                INTEGRATED CENTRAL HUB - INDORE
               </h1>
-              <span className="text-xs bg-blue-600/25 text-blue-300 px-2 py-0.5 rounded border border-blue-500/50 font-bold tracking-wide">
-                Dock Operations
-              </span>
+              {/* Version History Live Badge Pill */}
+              <button
+                type="button"
+                onClick={onOpenVersionModal}
+                className="inline-flex items-center gap-1 text-xs bg-indigo-500/25 hover:bg-indigo-500/40 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-400/40 font-mono font-bold tracking-wide transition cursor-pointer shadow-2xs group"
+                title="Click to view Version History & System Changelog"
+              >
+                <Sparkles className="w-3 h-3 text-indigo-400 group-hover:animate-spin" />
+                <span>{CURRENT_APP_VERSION}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+                <span className="text-[10px] text-emerald-400 uppercase font-sans font-extrabold">Live</span>
+              </button>
             </div>
             <p className="text-xs text-slate-400 font-medium mt-0.5">
-              Docks 1 to 9 | Movement, Dispatch & Audit Control
+              Docks 1 to 9 | Movement, Dispatch & Executive Control
             </p>
           </div>
         </div>
 
         {/* Right Status and Controls */}
         <div className="flex items-center flex-wrap gap-2 sm:gap-3 text-sm">
+          {/* Version History Quick Link */}
+          <button
+            type="button"
+            id="navVersionHistoryBtn"
+            onClick={onOpenVersionModal}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="View Release Milestones & Changelog"
+          >
+            <History className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">Changelog</span>
+          </button>
+
           {/* GitHub Single HTML Download */}
           <button
             type="button"
@@ -80,7 +104,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Download complete standalone HTML file (index.html) for GitHub / GitHub Pages"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Download GitHub HTML</span>
+            <span className="hidden md:inline">Download HTML</span>
+            <span className="md:hidden">HTML</span>
           </button>
 
           {/* Inventory Overview Button */}
@@ -127,4 +152,5 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+
 
