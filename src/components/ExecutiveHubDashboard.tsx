@@ -44,6 +44,7 @@ interface ExecutiveHubDashboardProps {
   dailyPlans: DailyPlanRecord[];
   lang: Language;
   onSyncGoogleSheets: () => void;
+  onResetSheetToEmpty?: () => void;
   isSyncing?: boolean;
   lastSyncTime?: string | null;
 }
@@ -53,6 +54,7 @@ export const ExecutiveHubDashboard: React.FC<ExecutiveHubDashboardProps> = ({
   dailyPlans,
   lang,
   onSyncGoogleSheets,
+  onResetSheetToEmpty,
   isSyncing = false,
   lastSyncTime,
 }) => {
@@ -557,8 +559,49 @@ export const ExecutiveHubDashboard: React.FC<ExecutiveHubDashboardProps> = ({
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{isSyncing ? 'Syncing...' : 'Sync Sheet'}</span>
               </button>
+
+              {/* Master Reset Button (Optional Wipe) */}
+              {onResetSheetToEmpty && (
+                <button
+                  type="button"
+                  onClick={onResetSheetToEmpty}
+                  className="px-3.5 py-2.5 bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/60 font-bold rounded-xl text-xs flex items-center gap-1.5 transition cursor-pointer"
+                  title="Wipe all data rows from Google Sheets (Keeps Row 1 headers intact)"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="hidden sm:inline">Reset Sheet</span>
+                </button>
+              )}
             </div>
           </div>
+
+          {/* ZERO RECORDS STATE NOTIFICATION BANNER */}
+          {dockRecords.length === 0 && dailyPlans.length === 0 && (
+            <div className="bg-slate-800/90 border border-blue-500/30 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-white text-xs">
+                    Live System Active • 0 Records (Clean Empty State)
+                  </h4>
+                  <p className="text-slate-400 text-[11px] mt-0.5">
+                    No mock or sample records generated. The dashboard strictly displays real rows fetched from your Google Sheet.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onSyncGoogleSheets}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs transition"
+                >
+                  Fetch Now
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Quick Filter Selector Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">

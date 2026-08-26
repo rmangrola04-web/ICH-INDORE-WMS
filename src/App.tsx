@@ -44,6 +44,7 @@ import {
   updateLiveDailyPlan,
   deleteLiveDailyPlan,
   bulkDeleteLiveDailyPlans,
+  resetSheetToEmpty,
   COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS,
 } from './utils/googleSheetsService';
 
@@ -64,6 +65,8 @@ export default function App() {
   const [syncMessage, setSyncMessage] = useState<string>('');
   const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
+  const [isResettingSheet, setIsResettingSheet] = useState<boolean>(false);
   const [customScriptUrl, setCustomScriptUrl] = useState<string>(() => getActiveGoogleScriptUrl());
   const [isCopiedCode, setIsCopiedCode] = useState<boolean>(false);
   const [isVersionModalOpen, setIsVersionModalOpen] = useState<boolean>(false);
@@ -550,6 +553,29 @@ export default function App() {
     handleFetchFromGoogleSheet(false);
   };
 
+  const handleExecuteResetToEmpty = async () => {
+    setIsResettingSheet(true);
+    try {
+      const activeUrl = (customScriptUrl || getActiveGoogleScriptUrl()).trim();
+      if (activeUrl) {
+        await resetSheetToEmpty(activeUrl);
+      }
+      setDockRecords([]);
+      setDailyPlans([]);
+      setRecords([]);
+      setSyncStatus('success');
+      setSyncMessage('Google Sheet reset cleanly to 0 records (Row 1 headers preserved).');
+      setIsResetConfirmOpen(false);
+      setIsSettingsOpen(false);
+    } catch (err: any) {
+      console.error('Reset sheet error:', err);
+      setSyncStatus('error');
+      setSyncMessage(err.message || 'Failed to reset sheet.');
+    } finally {
+      setIsResettingSheet(false);
+    }
+  };
+
   const handleCopyScriptCode = () => {
     navigator.clipboard.writeText(COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS);
     setIsCopiedCode(true);
@@ -647,6 +673,7 @@ export default function App() {
               dailyPlans={dailyPlans}
               lang={lang}
               onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
+              onResetSheetToEmpty={() => setIsResetConfirmOpen(true)}
               isSyncing={isFetchingSheet}
               lastSyncTime={lastSyncTime}
             />
@@ -881,6 +908,28 @@ export default function App() {
                   Open your Google Sheet → <strong>Extensions → Apps Script</strong> → Paste this code → <strong>Deploy → New deployment → Web app</strong> (Execute as: Me, Who has access: Anyone).
                 </p>
               </div>
+
+              {/* DANGER ZONE: MASTER WIPE TO 0 RECORDS */}
+              <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 space-y-2.5">
+                <div className="flex items-center gap-2 text-rose-900 font-bold text-xs">
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Master Wipe / Clean Reset (Action: RESET_TO_EMPTY)</span>
+                </div>
+                <p className="text-[11px] text-rose-700 leading-relaxed">
+                  Permanently wipe all data rows from <code>Dock_Operations</code> and <code>Daily_Plan_Execution</code> sheets. Row 1 column headers remain completely intact, instantly resetting total record counts to 0.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSettingsOpen(false);
+                    setIsResetConfirmOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Wipe All Records & Reset to 0</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
@@ -897,6 +946,51 @@ export default function App() {
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold cursor-pointer shadow-xs"
               >
                 Save & Connect Sheet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset to 0 Confirmation Dialog Modal */}
+      {isResetConfirmOpen && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-rose-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Reset Sheet to Empty (0 Records)?</h3>
+                <p className="text-xs text-slate-500">Action: RESET_TO_EMPTY</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              This action will invoke the master backend wipe to delete <strong>all data rows</strong> from both <code className="font-mono text-slate-800 font-bold">Dock_Operations</code> and <code className="font-mono text-slate-800 font-bold">Daily_Plan_Execution</code> in your Google Spreadsheet. Row 1 headers will remain untouched.
+            </p>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-[11px] text-amber-800">
+              <strong>Note:</strong> Zero dummy/mock records will be created. The system will start fresh with exactly 0 rows.
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsResetConfirmOpen(false)}
+                disabled={isResettingSheet}
+                className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteResetToEmpty}
+                disabled={isResettingSheet}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isResettingSheet ? 'Wiping Sheet...' : 'Yes, Wipe & Reset to 0'}</span>
               </button>
             </div>
           </div>

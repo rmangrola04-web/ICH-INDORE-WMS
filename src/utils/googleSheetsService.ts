@@ -519,6 +519,35 @@ export async function bulkDeleteLiveSheetRecords(ids: string[], tokenIds?: strin
 }
 
 /**
+ * RESET_TO_EMPTY: Master Backend Action to wipe all data rows from Google Sheets
+ * Preserves Row 1 headers intact and resets data row counts cleanly to 0.
+ */
+export async function resetSheetToEmpty(customUrl?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  const payload = {
+    action: 'RESET_TO_EMPTY',
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true, message: 'Google Sheets wiped cleanly. Table count reset to 0.' };
+  } catch (err: any) {
+    console.error('Reset sheet to empty failed:', err);
+    return { success: false, error: err.message || 'Failed to wipe data rows from Google Sheet.' };
+  }
+}
+
+/**
  * Full Complete Google Apps Script (Code.gs) for deployment
  */
 export const COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS = `/**
@@ -561,6 +590,27 @@ function handleRequest(e, method) {
     } else if (e && e.parameter && e.parameter.action) {
       action = e.parameter.action;
       payload = e.parameter;
+    }
+
+    // ==========================================
+    // 0. MASTER RESET / WIPE TO EMPTY (Keeps Row 1 Headers Intact)
+    // ==========================================
+    if (action === "RESET_TO_EMPTY" || action === "WIPE_SHEET" || action === "CLEAR_ALL") {
+      var dockLastRow = dockSheet.getLastRow();
+      if (dockLastRow > 1) {
+        dockSheet.deleteRows(2, dockLastRow - 1);
+      }
+      var planLastRow = planSheet.getLastRow();
+      if (planLastRow > 1) {
+        planSheet.deleteRows(2, planLastRow - 1);
+      }
+      ensureHeaders(dockSheet);
+      ensurePlanHeaders(planSheet);
+      return createJsonResponse({
+        status: "success",
+        message: "Google Sheets reset to clean empty state (Row 1 headers preserved).",
+        count: 0
+      });
     }
 
     // ==========================================

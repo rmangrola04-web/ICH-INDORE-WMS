@@ -288,10 +288,15 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
           };
         });
 
-        onSyncFromSheet(mappedRecords);
+        if (onSyncFromSheet) {
+          onSyncFromSheet(mappedRecords);
+        }
         setWebhookStatus(`Successfully synced ${mappedRecords.length} records from Google Sheet!`);
       } else {
-        setWebhookStatus('Connected to Google Sheet, but no rows were found.');
+        if (onSyncFromSheet) {
+          onSyncFromSheet([]);
+        }
+        setWebhookStatus('Connected to Google Sheet: 0 records found (Clean empty state).');
       }
     } catch (err: any) {
       console.warn('Google Sheet fetch error:', err);
