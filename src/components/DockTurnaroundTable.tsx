@@ -14,13 +14,11 @@ import {
   DoorOpen,
   Check,
   ShieldCheck,
-  UploadCloud,
   AlertTriangle
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, DockStatus, DockOperation, PodStatus, Language } from '../types';
 import { t } from '../utils/translations';
-import { CSVImportModal } from './CSVImportModal';
-import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
+import { exportToCSV } from '../utils/exportUtils';
 
 interface DockTurnaroundTableProps {
   records: DockRecord[];
@@ -31,7 +29,6 @@ interface DockTurnaroundTableProps {
   onBulkDelete?: (ids: string[]) => void;
   onEditRecord: (record: DockRecord) => void;
   onQuickComplete?: (id: string) => void;
-  onApplyCSVImport?: (records: DockRecord[]) => void;
 }
 
 export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
@@ -43,7 +40,6 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
   onBulkDelete,
   onEditRecord,
   onQuickComplete,
-  onApplyCSVImport,
 }) => {
   const dict = t[lang];
 
@@ -56,19 +52,8 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
   const [sortField, setSortField] = useState<'startTime' | 'vehicleNo' | 'gateNo'>('startTime');
   const [sortAsc, setSortAsc] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [isCSVModalOpen, setIsCSVModalOpen] = useState<boolean>(false);
-  const [csvSuccessMsg, setCsvSuccessMsg] = useState<string | null>(null);
 
   const masterCheckboxRef = useRef<HTMLInputElement>(null);
-
-  const handleApplyImport = (updatedRecords: DockRecord[], summary: CSVImportResult) => {
-    if (onApplyCSVImport) {
-      onApplyCSVImport(updatedRecords);
-    }
-    const msg = `CSV Updated: ${summary.updatedCount} records corrected, ${summary.addedCount} new entries added!`;
-    setCsvSuccessMsg(msg);
-    setTimeout(() => setCsvSuccessMsg(null), 6000);
-  };
 
   // Helper: Turnaround Time (TAT) calculation
   const calculateTAT = (startStr: string, exitStr?: string, status?: DockStatus) => {
@@ -309,60 +294,7 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
 
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return;
-
-    const headers = [
-      'ID',
-      'Date',
-      'Unit',
-      'Gate/Dock',
-      'Operation',
-      'Vehicle No',
-      'Vehicle Type',
-      'Seal No',
-      'Invoice No',
-      'LR No',
-      'POD Status',
-      'Transporter',
-      'Supervisor',
-      'Start Time',
-      'Exit Time',
-      'TAT',
-      'Status',
-      'Remarks',
-    ];
-
-    const rows = filteredRecords.map((r) => {
-      const tat = calculateTAT(r.startTime, r.exitTime, r.status).text;
-      return [
-        `"${r.id}"`,
-        `"${r.date}"`,
-        `"${r.unit}"`,
-        `"${r.gateNo}"`,
-        `"${r.operation}"`,
-        `"${r.vehicleNo}"`,
-        `"${r.vehicleType || ''}"`,
-        `"${r.sealNo || ''}"`,
-        `"${r.invoiceNo || ''}"`,
-        `"${r.lrNo || ''}"`,
-        `"${r.podStatus || 'POD Clean'}"`,
-        `"${r.transporterName || ''}"`,
-        `"${r.supervisorName}"`,
-        `"${r.startTime}"`,
-        `"${r.exitTime || ''}"`,
-        `"${tat}"`,
-        `"${r.status}"`,
-        `"${r.remarks || ''}"`,
-      ];
-    });
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `AHPL_AIL_Dock_POD_Log_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToCSV(filteredRecords, `AHPL_AIL_Dock_POD_Log_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
   const getUnitBadge = (unit: CompanyUnit) => {
@@ -413,26 +345,6 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={() => downloadSampleCSVTemplate()}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer"
-              title="Download Sample CSV Template"
-            >
-              <Download className="w-3.5 h-3.5 text-blue-600" />
-              <span className="hidden sm:inline">CSV Template</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsCSVModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Upload CSV/Excel to correct or update records"
-            >
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span>{lang === 'hi' ? 'CSV डेटा अपलोड / सुधार' : 'Upload / Correct CSV'}</span>
-            </button>
-
-            <button
-              type="button"
               onClick={handleExportCSV}
               disabled={filteredRecords.length === 0}
               className="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
@@ -442,23 +354,6 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
             </button>
           </div>
         </div>
-
-        {/* CSV Import Success Toast */}
-        {csvSuccessMsg && (
-          <div className="mb-4 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between shadow-xs animate-in slide-in-from-top-1">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span>{csvSuccessMsg}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCsvSuccessMsg(null)}
-              className="text-emerald-100 hover:text-white p-1"
-            >
-              &times;
-            </button>
-          </div>
-        )}
 
         {/* Bulk Actions Floating Toolbar */}
         {selectedIds.length > 0 && (
@@ -886,15 +781,6 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
           </table>
         </div>
       </div>
-
-      {/* CSV / Excel Upload Modal */}
-      <CSVImportModal
-        isOpen={isCSVModalOpen}
-        onClose={() => setIsCSVModalOpen(false)}
-        existingRecords={records}
-        onApplyImport={handleApplyImport}
-        lang={lang}
-      />
     </div>
   );
 };

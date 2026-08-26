@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Warehouse, Globe, PackageCheck, ShieldCheck, Download, Github, Code, History, Sparkles } from 'lucide-react';
+import { Warehouse, Globe, PackageCheck, ShieldCheck, History, Sparkles } from 'lucide-react';
 import { Language } from '../types';
 import { t } from '../utils/translations';
-import { downloadStandaloneAppHTML } from '../utils/exportUtils';
 import { CURRENT_APP_VERSION } from '../data/changelogData';
 
 interface NavbarProps {
@@ -93,19 +92,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <History className="w-3.5 h-3.5 text-indigo-400" />
             <span className="hidden sm:inline">Changelog</span>
-          </button>
-
-          {/* GitHub Single HTML Download */}
-          <button
-            type="button"
-            id="downloadGithubHtmlBtn"
-            onClick={() => downloadStandaloneAppHTML('index.html')}
-            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-            title="Download complete standalone HTML file (index.html) for GitHub / GitHub Pages"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Download HTML</span>
-            <span className="md:hidden">HTML</span>
           </button>
 
           {/* Inventory Overview Button */}

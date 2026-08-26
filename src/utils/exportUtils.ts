@@ -1,46 +1,78 @@
-import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DockRecord } from '../types';
 
-export const exportToExcel = (records: DockRecord[], filename: string = 'AHPL_AIL_Operations_Log.xlsx') => {
-  const data = records.map((r, idx) => ({
-    'S.No': idx + 1,
-    'Record ID': r.id,
-    'Date': r.date,
-    'Operating Unit': r.unit,
-    'Assigned Dock': r.gateNo,
-    'Operation': r.operation,
-    'Vehicle Number': r.vehicleNo,
-    'Vehicle Type': r.vehicleType || '32 Ft SXL',
-    'Seal Number': r.sealNo || 'N/A',
-    'Invoice Number': r.invoiceNo || 'N/A',
-    'LR Number': r.lrNo || 'N/A',
-    'POD Status': r.podStatus || 'POD Clean',
-    'Transporter': r.transporterName || 'ICRL',
-    'Supervisor': r.supervisorName,
-    'Start Time': r.startTime,
-    'Exit Time': r.exitTime || '--',
-    'Status': r.status,
-    'Attached Doc': r.attachedDoc ? r.attachedDoc.name : 'None',
-    'Remarks': r.remarks || '',
-  }));
+/**
+ * 1. Single CSV File Export
+ * Generates and downloads a clean, standard CSV file of Dock and Transport Operations.
+ */
+export const exportToCSV = (records: DockRecord[], filename?: string) => {
+  const actualFilename =
+    filename || `AHPL_AIL_Dock_Operations_Report_${new Date().toISOString().slice(0, 10)}.csv`;
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Dock & POD Log');
+  const headers = [
+    'S.No',
+    'Record ID',
+    'Date',
+    'Operating Unit',
+    'Assigned Dock',
+    'Operation',
+    'Vehicle Number',
+    'Vehicle Type',
+    'Seal Number',
+    'Invoice Number',
+    'LR Number',
+    'POD Status',
+    'Transporter',
+    'Supervisor',
+    'Start Time',
+    'Exit Time',
+    'Status',
+    'Remarks',
+  ];
 
-  // Auto-width columns
-  const maxProps = Object.keys(data[0] || {});
-  const colWidths = maxProps.map((key) => ({
-    wch: Math.max(key.length, 14),
-  }));
-  worksheet['!cols'] = colWidths;
+  const rows = records.map((r, idx) => [
+    idx + 1,
+    `"${r.id}"`,
+    `"${r.date}"`,
+    `"${r.unit}"`,
+    `"${r.gateNo}"`,
+    `"${r.operation}"`,
+    `"${r.vehicleNo}"`,
+    `"${r.vehicleType || ''}"`,
+    `"${r.sealNo || ''}"`,
+    `"${r.invoiceNo || ''}"`,
+    `"${r.lrNo || ''}"`,
+    `"${r.podStatus || 'POD Clean'}"`,
+    `"${r.transporterName || ''}"`,
+    `"${r.supervisorName}"`,
+    `"${r.startTime}"`,
+    `"${r.exitTime || '--'}"`,
+    `"${r.status}"`,
+    `"${(r.remarks || '').replace(/"/g, '""')}"`,
+  ]);
 
-  XLSX.writeFile(workbook, filename);
+  const csvContent =
+    'data:text/csv;charset=utf-8,' +
+    [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', actualFilename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
-export const exportToPDF = (records: DockRecord[], filename: string = 'AHPL_AIL_Operations_Report.pdf') => {
+/**
+ * 2. Single PDF File Export
+ * Generates and downloads a formatted PDF report of Dock and Transport Operations.
+ */
+export const exportToPDF = (records: DockRecord[], filename?: string) => {
+  const actualFilename =
+    filename || `AHPL_AIL_Operations_Report_${new Date().toISOString().slice(0, 10)}.pdf`;
+
   const doc = new jsPDF('landscape', 'pt', 'a4');
 
   // Header Title
@@ -127,113 +159,5 @@ export const exportToPDF = (records: DockRecord[], filename: string = 'AHPL_AIL_
     margin: { left: 40, right: 40 },
   });
 
-  doc.save(filename);
+  doc.save(actualFilename);
 };
-
-export const generateHTMLReport = (records: DockRecord[]): string => {
-  const rowsHtml = records
-    .map(
-      (r, idx) => `
-    <tr>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${idx + 1}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${r.id}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0;">${r.date}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold;">${r.unit}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold; color: #4338ca;">${r.gateNo}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0;">${r.operation}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-weight: bold; font-family: monospace;">${r.vehicleNo}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${r.sealNo || '--'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${r.invoiceNo || '--'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${r.lrNo || '--'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; color: ${
-        r.podStatus === 'POD Clean' ? '#047857' : '#b91c1c'
-      }; font-weight: bold;">${r.podStatus || 'POD Clean'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0;">${r.transporterName || 'ICRL'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0;">${r.supervisorName}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0; font-family: monospace;">${r.startTime} → ${r.exitTime || '--:--'}</td>
-      <td style="padding: 8px; border: 1px solid #e2e8f0;">${r.status}</td>
-    </tr>`
-    )
-    .join('');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>AHPL & AIL - Dock & Transport Operations Export Log</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 24px; color: #1e293b; background: #f8fafc; }
-    h1 { color: #0f172a; margin-bottom: 4px; font-size: 20px; }
-    p.meta { color: #64748b; font-size: 12px; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; background: #ffffff; font-size: 12px; }
-    th { background: #0f172a; color: #ffffff; text-align: left; padding: 10px 8px; border: 1px solid #0f172a; font-size: 11px; text-transform: uppercase; }
-    tr:nth-child(even) { background-color: #f1f5f9; }
-    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <h1>AHPL & AIL - Dock, Transport & POD Operations Hub</h1>
-  <p class="meta">Export Generated: ${new Date().toLocaleString()} | Total Records: ${records.length} | Docks: AHPL (1-4) & AIL (5-9)</p>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>ID</th>
-        <th>Date</th>
-        <th>Unit</th>
-        <th>Dock</th>
-        <th>Operation</th>
-        <th>Vehicle No</th>
-        <th>Seal No</th>
-        <th>Invoice</th>
-        <th>LR No</th>
-        <th>POD Status</th>
-        <th>Transporter</th>
-        <th>Supervisor</th>
-        <th>Timing</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-    </tbody>
-  </table>
-</body>
-</html>`;
-};
-
-export const downloadHTMLReport = (records: DockRecord[], filename: string = 'AHPL_AIL_Operations_Report.html') => {
-  const html = generateHTMLReport(records);
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
-export const downloadStandaloneAppHTML = async (filename: string = 'index.html') => {
-  try {
-    const res = await fetch('/standalone.html');
-    if (res.ok) {
-      const text = await res.text();
-      const blob = new Blob([text], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      return;
-    }
-  } catch (err) {
-    console.error('Fetch failed, falling back to direct open', err);
-  }
-  window.open('/standalone.html', '_blank');
-};
-

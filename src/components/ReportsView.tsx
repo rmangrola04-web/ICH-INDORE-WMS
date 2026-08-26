@@ -7,29 +7,22 @@ import {
   ShieldCheck,
   AlertTriangle,
   FileText,
-  Code2,
-  Copy,
-  Check,
   Paperclip,
   Eye,
   Trash2,
   Edit,
   ExternalLink,
-  UploadCloud,
   X,
 } from 'lucide-react';
 import { DockRecord, CompanyUnit, DockOperation, DockStatus, PodStatus, Language, AttachedDocument } from '../types';
 import { t } from '../utils/translations';
-import { exportToExcel, exportToPDF, downloadHTMLReport, generateHTMLReport, downloadStandaloneAppHTML } from '../utils/exportUtils';
-import { CSVImportModal } from './CSVImportModal';
-import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
+import { exportToCSV, exportToPDF } from '../utils/exportUtils';
 
 interface ReportsViewProps {
   records: DockRecord[];
   lang: Language;
   onEditRecord: (record: DockRecord) => void;
   onDeleteRecord: (id: string) => void;
-  onApplyCSVImport?: (records: DockRecord[]) => void;
 }
 
 export const ReportsView: React.FC<ReportsViewProps> = ({
@@ -37,7 +30,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   lang,
   onEditRecord,
   onDeleteRecord,
-  onApplyCSVImport,
 }) => {
   const dict = t[lang];
 
@@ -51,20 +43,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
 
-  // Modals / Copied state
-  const [copiedHtml, setCopiedHtml] = useState<boolean>(false);
+  // Modals / Preview state
   const [previewDoc, setPreviewDoc] = useState<{ doc: AttachedDocument; vehicleNo: string } | null>(null);
-  const [isCSVModalOpen, setIsCSVModalOpen] = useState<boolean>(false);
-  const [csvSuccessMsg, setCsvSuccessMsg] = useState<string | null>(null);
-
-  const handleApplyImport = (updatedRecords: DockRecord[], summary: CSVImportResult) => {
-    if (onApplyCSVImport) {
-      onApplyCSVImport(updatedRecords);
-    }
-    const msg = `CSV Update Complete: ${summary.updatedCount} records corrected, ${summary.addedCount} new entries added!`;
-    setCsvSuccessMsg(msg);
-    setTimeout(() => setCsvSuccessMsg(null), 6000);
-  };
 
   // Extract unique supervisors
   const uniqueSupervisors = useMemo(() => {
@@ -211,76 +191,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   // CSV Export Handler
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return;
-
-    const headers = [
-      'Report ID',
-      'Date',
-      'Company Unit',
-      'Gate / Dock',
-      'Operation',
-      'Vehicle Number',
-      'Vehicle Type',
-      'Seal No',
-      'Invoice No',
-      'LR No',
-      'POD Status',
-      'Transporter',
-      'Supervisor Name',
-      'Start Time',
-      'Exit Time',
-      'Turnaround Time (TAT)',
-      'Status',
-      'Remarks',
-    ];
-
-    const rows = filteredRecords.map((r) => {
-      const tat = getTATData(r.startTime, r.exitTime).text;
-      return [
-        `"${r.id}"`,
-        `"${r.date}"`,
-        `"${r.unit}"`,
-        `"${r.gateNo}"`,
-        `"${r.operation}"`,
-        `"${r.vehicleNo}"`,
-        `"${r.vehicleType || ''}"`,
-        `"${r.sealNo || ''}"`,
-        `"${r.invoiceNo || ''}"`,
-        `"${r.lrNo || ''}"`,
-        `"${r.podStatus || 'POD Clean'}"`,
-        `"${r.transporterName || ''}"`,
-        `"${r.supervisorName}"`,
-        `"${r.startTime}"`,
-        `"${r.exitTime || '--'}"`,
-        `"${tat}"`,
-        `"${r.status}"`,
-        `"${(r.remarks || '').replace(/"/g, '""')}"`,
-      ];
-    });
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `AHPL_AIL_Dock_Operations_Report_${new Date().toISOString().slice(0, 10)}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportToCSV(filteredRecords, `AHPL_AIL_Dock_Operations_Report_${new Date().toISOString().slice(0, 10)}.csv`);
   };
 
-  // Copy Clean HTML Table Handler
-  const handleCopyHTML = () => {
-    const html = generateHTMLReport(filteredRecords);
-    navigator.clipboard.writeText(html);
-    setCopiedHtml(true);
-    setTimeout(() => setCopiedHtml(false), 2500);
-  };
-
+  // Reset Filters Handler
   const handleResetFilters = () => {
     setFilterUnit('ALL');
     setFilterSupervisor('ALL');
@@ -300,101 +214,37 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <div>
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <FileSpreadsheet className="w-5 h-5 text-indigo-600" />
-              <span>{lang === 'hi' ? 'रिपोर्ट्स, HTML एवं एक्सपोर्ट हब' : 'Reports, HTML & Data Export Hub'}</span>
+              <span>{lang === 'hi' ? 'रिपोर्ट्स एवं डेटा एक्सपोर्ट हब' : 'Reports & Data Export Hub'}</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              AHPL (Docks 1-4) & AIL (Docks 5-9) | Direct Excel, PDF, CSV & Embedded HTML Table
+              AHPL (Docks 1-4) & AIL (Docks 5-9) | Direct CSV & PDF Export
             </p>
           </div>
 
-          {/* Export & Import Action Buttons */}
+          {/* Export Action Buttons: ONLY 1 CSV & 1 PDF */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* CSV / Excel Upload to Correct Data */}
-            <button
-              type="button"
-              onClick={() => setIsCSVModalOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-              title="Upload CSV or Excel file to update incorrect fields like Transporter, Location, Supervisor"
-            >
-              <UploadCloud className="w-4 h-4" />
-              <span>{lang === 'hi' ? 'CSV डेटा अपलोड / सुधार' : 'Upload / Correct CSV'}</span>
-            </button>
-
-            {/* Download 14-Col Template */}
-            <button
-              type="button"
-              onClick={() => downloadSampleCSVTemplate()}
-              className="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-              title="Download standard 14-column CSV template"
-            >
-              <Download className="w-4 h-4 text-blue-600" />
-              <span>Sample CSV</span>
-            </button>
-
-            {/* Single App HTML for GitHub */}
-            <button
-              type="button"
-              onClick={() => downloadStandaloneAppHTML('index.html')}
-              className="bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-              title="Download single-file standalone index.html ready for GitHub Pages or repository upload"
-            >
-              <Download className="w-4 h-4" />
-              <span>GitHub Single HTML</span>
-            </button>
-
-            {/* Excel (.xlsx) */}
-            <button
-              type="button"
-              onClick={() => exportToExcel(filteredRecords, `AHPL_AIL_Dock_POD_Export_${new Date().toISOString().slice(0, 10)}.xlsx`)}
-              disabled={filteredRecords.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Export Excel (.xlsx)</span>
-            </button>
-
-            {/* PDF (.pdf) */}
-            <button
-              type="button"
-              onClick={() => exportToPDF(filteredRecords, `AHPL_AIL_Dock_Operations_${new Date().toISOString().slice(0, 10)}.pdf`)}
-              disabled={filteredRecords.length === 0}
-              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Export PDF (.pdf)</span>
-            </button>
-
-            {/* HTML (.html) */}
-            <button
-              type="button"
-              onClick={() => downloadHTMLReport(filteredRecords, `AHPL_AIL_Report_${new Date().toISOString().slice(0, 10)}.html`)}
-              disabled={filteredRecords.length === 0}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-            >
-              <Code2 className="w-4 h-4" />
-              <span>Download HTML</span>
-            </button>
-
-            {/* Copy HTML Code */}
-            <button
-              type="button"
-              onClick={handleCopyHTML}
-              disabled={filteredRecords.length === 0}
-              className="bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white text-xs font-semibold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-            >
-              {copiedHtml ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-              <span>{copiedHtml ? 'Copied HTML!' : 'Copy HTML Table'}</span>
-            </button>
-
-            {/* CSV */}
+            {/* 1. CSV Export */}
             <button
               type="button"
               onClick={handleExportCSV}
               disabled={filteredRecords.length === 0}
-              className="border border-slate-300 hover:bg-slate-100 disabled:opacity-50 text-slate-700 text-xs font-semibold px-3 py-2 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              title="Export filtered records to CSV"
             >
               <Download className="w-4 h-4" />
-              <span>CSV</span>
+              <span>{lang === 'hi' ? 'CSV एक्सपोर्ट' : 'Export CSV'}</span>
+            </button>
+
+            {/* 2. PDF Export */}
+            <button
+              type="button"
+              onClick={() => exportToPDF(filteredRecords, `AHPL_AIL_Dock_Operations_${new Date().toISOString().slice(0, 10)}.pdf`)}
+              disabled={filteredRecords.length === 0}
+              className="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              title="Export filtered records to PDF"
+            >
+              <FileText className="w-4 h-4" />
+              <span>{lang === 'hi' ? 'PDF एक्सपोर्ट' : 'Export PDF'}</span>
             </button>
           </div>
         </div>
@@ -751,15 +601,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         </div>
       )}
-
-      {/* CSV / Excel Upload Modal */}
-      <CSVImportModal
-        isOpen={isCSVModalOpen}
-        onClose={() => setIsCSVModalOpen(false)}
-        existingRecords={records}
-        onApplyImport={handleApplyImport}
-        lang={lang}
-      />
     </div>
   );
 };

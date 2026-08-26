@@ -49,8 +49,6 @@ import {
   ALL_DOCKS,
   getDocksForCompany,
 } from '../types';
-import { CSVImportModal } from './CSVImportModal';
-import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
 import { COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS } from '../utils/googleSheetsService';
 
 interface GuardSupervisorTrackerProps {
@@ -87,21 +85,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
 }) => {
   // View mode switcher: 'auto' | 'laptop' | 'tablet' | 'mobile' (with 'desktop' aliasing to laptop)
   const [viewMode, setViewMode] = useState<'auto' | 'laptop' | 'desktop' | 'tablet' | 'mobile'>('auto');
-
-  // CSV Import Modal & Feedback State
-  const [isCSVModalOpen, setIsCSVModalOpen] = useState(false);
-  const [csvSuccessMsg, setCsvSuccessMsg] = useState<string | null>(null);
-
-  const handleApplyCSVImport = (updatedRecords: DockRecord[], summary: CSVImportResult) => {
-    if (onBatchUpdateRecords) {
-      onBatchUpdateRecords(updatedRecords);
-    } else if (onSyncFromSheet) {
-      onSyncFromSheet(updatedRecords);
-    }
-    const msg = `CSV Update Successful! ${summary.updatedCount} records corrected, ${summary.addedCount} new records added (${summary.totalParsed} total rows processed).`;
-    setCsvSuccessMsg(msg);
-    setTimeout(() => setCsvSuccessMsg(null), 8000);
-  };
 
   // Desktop active tab
   const [desktopTab, setDesktopTab] = useState<'dashboard' | 'taskboard' | 'gateEntry' | 'records'>('dashboard');
@@ -565,26 +548,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => downloadSampleCSVTemplate()}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
-            title="Download 14-Column Sample CSV Template"
-          >
-            <Download className="w-3.5 h-3.5 text-blue-400" />
-            <span className="hidden sm:inline">Sample CSV</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsCSVModalOpen(true)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs border border-blue-400/30"
-            title="Upload CSV/Excel file to update wrong data"
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload CSV / Correct Data</span>
-          </button>
-
-          <button
-            type="button"
             onClick={handleFetchFromSheet}
             disabled={isFetchingSheet}
             className="text-slate-300 hover:text-white p-2 hover:bg-slate-800 rounded-lg transition cursor-pointer disabled:opacity-50"
@@ -594,23 +557,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
           </button>
         </div>
       </header>
-
-      {/* CSV Success Notification Banner */}
-      {csvSuccessMsg && (
-        <div className="bg-emerald-600 text-white px-5 py-2.5 text-xs font-semibold flex items-center justify-between shadow-xs animate-in slide-in-from-top-2">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
-            <span>{csvSuccessMsg}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCsvSuccessMsg(null)}
-            className="text-emerald-100 hover:text-white p-1 rounded transition cursor-pointer"
-          >
-            &times;
-          </button>
-        </div>
-      )}
 
       {/* Webhook Configuration Drawer */}
       {showWebhookSettings && (
@@ -744,16 +690,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
               >
                 <ClipboardList className="w-4 h-4" />
                 <span>Log Reports</span>
-              </button>
-            </li>
-            <li className="pt-2">
-              <button
-                type="button"
-                onClick={() => setIsCSVModalOpen(true)}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 transition cursor-pointer text-left font-bold text-xs"
-              >
-                <UploadCloud className="w-4 h-4 text-blue-400" />
-                <span>Upload CSV / Correct</span>
               </button>
             </li>
           </ul>
@@ -1285,26 +1221,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                       <option value="In Progress">In Progress</option>
                       <option value="Loaded / Unloaded">Loaded / Unloaded</option>
                     </select>
-
-                    <button
-                      type="button"
-                      onClick={() => downloadSampleCSVTemplate()}
-                      className="px-2.5 py-1.5 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
-                      title="Download 14-Column CSV Template"
-                    >
-                      <Download className="w-3.5 h-3.5 text-blue-600" />
-                      <span className="hidden sm:inline">CSV Template</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsCSVModalOpen(true)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-                      title="Upload CSV/Excel to fix or update records"
-                    >
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      <span>Upload / Correct CSV</span>
-                    </button>
                   </div>
                 </div>
 
@@ -2032,15 +1948,6 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
           </div>
         </div>
       )}
-
-      {/* CSV / Excel Data Upload & Correction Modal */}
-      <CSVImportModal
-        isOpen={isCSVModalOpen}
-        onClose={() => setIsCSVModalOpen(false)}
-        existingRecords={records}
-        onApplyImport={handleApplyCSVImport}
-        lang={lang}
-      />
     </div>
   );
 };

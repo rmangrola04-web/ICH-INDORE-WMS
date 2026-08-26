@@ -157,12 +157,12 @@ export const ExecutiveHubDashboard: React.FC<ExecutiveHubDashboardProps> = ({
     const todayDocks = dockRecords.filter((d) => isRecordToday(d.date, d.entryTime));
 
     // Plan Received Time: latest plan intake or standard shift cutoff
-    let planReceivedTime = '08:30 AM Shift Receipt';
+    let planReceivedTime = '08:30 AM Plan Received';
     if (todayPlans.length > 0) {
       const latestPlan = todayPlans[0];
       if (latestPlan.createdAt) {
         const match = latestPlan.createdAt.match(/\d{2}:\d{2}/);
-        if (match) planReceivedTime = `${match[0]} Live Sync`;
+        if (match) planReceivedTime = `${match[0]} Plan Received`;
       }
     }
 

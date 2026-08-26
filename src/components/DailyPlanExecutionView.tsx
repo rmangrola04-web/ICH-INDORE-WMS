@@ -95,25 +95,6 @@ export const VEHICLE_TYPE_OPTIONS: string[] = [
   'Part Load (PTL)',
 ];
 
-export const DEFAULT_AHPL_DOCKS: string[] = ['Dock 01', 'Dock 02', 'Dock 03', 'Dock 04'];
-export const DEFAULT_AIL_DOCKS: string[] = ['Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'];
-export const DEFAULT_BOTH_DOCKS: string[] = [
-  'Dock 01 & Dock 05 (Dual Bay)',
-  'Dock 02 & Dock 06 (Dual Bay)',
-  'Dock 03 & Dock 07 (Dual Bay)',
-  'Dock 04 & Dock 08 (Dual Bay)',
-  'Dock 01',
-  'Dock 02',
-  'Dock 03',
-  'Dock 04',
-  'Dock 05',
-  'Dock 06',
-  'Dock 07',
-  'Dock 08',
-  'Dock 09',
-  'Custom Dock / Dual Bay',
-];
-
 export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   plans,
   lang,
@@ -145,8 +126,6 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const todayStr = new Date().toISOString().slice(0, 10);
   const [formPlanDate, setFormPlanDate] = useState<string>(todayStr);
   const [formCompany, setFormCompany] = useState<'AHPL' | 'AIL' | 'Both (AHPL & AIL)'>('AHPL');
-  const [formAssignedDock, setFormAssignedDock] = useState<string>('Dock 01');
-  const [formCustomDock, setFormCustomDock] = useState<string>('');
   const [formDestination, setFormDestination] = useState<string>(DEFAULT_PLAN_LOCATIONS[0]);
   const [formCustomDestination, setFormCustomDestination] = useState<string>('');
   const [formTransporter, setFormTransporter] = useState<string>('MATA');
@@ -155,23 +134,9 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const [formWeight, setFormWeight] = useState<string>('');
   const [formCft, setFormCft] = useState<string>('');
 
-  // Handle Company Selection Change in Modal to adapt Docks dynamically
+  // Handle Company Selection Change in Modal
   const handleCompanyChange = (newComp: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)') => {
     setFormCompany(newComp);
-    if (newComp === 'AHPL') {
-      if (!DEFAULT_AHPL_DOCKS.includes(formAssignedDock)) {
-        setFormAssignedDock('Dock 01');
-      }
-    } else if (newComp === 'AIL') {
-      if (!DEFAULT_AIL_DOCKS.includes(formAssignedDock)) {
-        setFormAssignedDock('Dock 05');
-      }
-    } else {
-      // Both (AHPL & AIL)
-      if (!DEFAULT_BOTH_DOCKS.includes(formAssignedDock)) {
-        setFormAssignedDock('Dock 01 & Dock 05 (Dual Bay)');
-      }
-    }
   };
 
   // Open Add Modal
@@ -179,8 +144,6 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
     setEditingPlan(null);
     setFormPlanDate(todayStr);
     setFormCompany('AHPL');
-    setFormAssignedDock('Dock 01');
-    setFormCustomDock('');
     setFormDestination(DEFAULT_PLAN_LOCATIONS[0]);
     setFormCustomDestination('');
     setFormTransporter('MATA');
@@ -205,23 +168,6 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
         ? 'AIL'
         : 'AHPL';
     setFormCompany(comp);
-
-    const dock = plan.assignedDock || (comp === 'AIL' ? 'Dock 05' : comp === 'Both (AHPL & AIL)' ? 'Dock 01 & Dock 05 (Dual Bay)' : 'Dock 01');
-    if (comp === 'AHPL') {
-      setFormAssignedDock(DEFAULT_AHPL_DOCKS.includes(dock) ? dock : 'Dock 01');
-      setFormCustomDock('');
-    } else if (comp === 'AIL') {
-      setFormAssignedDock(DEFAULT_AIL_DOCKS.includes(dock) ? dock : 'Dock 05');
-      setFormCustomDock('');
-    } else {
-      if (DEFAULT_BOTH_DOCKS.includes(dock)) {
-        setFormAssignedDock(dock);
-        setFormCustomDock('');
-      } else {
-        setFormAssignedDock('Custom Dock / Dual Bay');
-        setFormCustomDock(dock);
-      }
-    }
 
     if (DEFAULT_PLAN_LOCATIONS.includes(plan.destination)) {
       setFormDestination(plan.destination);
@@ -272,17 +218,11 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
         ? formCustomTransporter.trim() || 'OTHER'
         : formTransporter;
 
-    const resolvedDock =
-      formAssignedDock === 'Custom Dock / Dual Bay'
-        ? formCustomDock.trim() || (formCompany === 'AIL' ? 'Dock 05' : formCompany === 'Both (AHPL & AIL)' ? 'Dock 01 & Dock 05' : 'Dock 01')
-        : formAssignedDock;
-
     if (editingPlan) {
       const updated: DailyPlanRecord = {
         ...editingPlan,
         planDate: formPlanDate,
         company: formCompany,
-        assignedDock: resolvedDock,
         destination: resolvedDestination,
         transporterName: resolvedTransporter || undefined,
         dispatchMode: formVehicleType || undefined,
@@ -295,7 +235,6 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
       onAddPlan({
         planDate: formPlanDate,
         company: formCompany,
-        assignedDock: resolvedDock,
         destination: resolvedDestination,
         transporterName: resolvedTransporter || undefined,
         dispatchMode: formVehicleType || undefined,
@@ -982,7 +921,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
 
             {/* Streamlined Modal Form */}
             <form onSubmit={handleSubmitPlan} className="space-y-4 pt-4">
-              {/* Field 1: Plan Date [Required] & Field 2: Company Name [Required] */}
+              {/* Row 1: Plan Date [Required] & Company Name [Required] */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1020,65 +959,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                 </div>
               </div>
 
-              {/* Field 2.5: Assigned Dock Bay (Dynamic based on Company selection) */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    Assigned Dock Bay <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[11px] font-medium text-slate-500">
-                    {formCompany === 'AHPL' && '(Docks 01–04 for AHPL)'}
-                    {formCompany === 'AIL' && '(Docks 05–09 for AIL)'}
-                    {formCompany === 'Both (AHPL & AIL)' && '(All Docks 01–09 or Dual Bays)'}
-                  </span>
-                </div>
-
-                <select
-                  required
-                  value={formAssignedDock}
-                  onChange={(e) => setFormAssignedDock(e.target.value)}
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-2xs cursor-pointer"
-                >
-                  {formCompany === 'AHPL' &&
-                    DEFAULT_AHPL_DOCKS.map((d) => (
-                      <option key={d} value={d}>
-                        {d} (AHPL Bay)
-                      </option>
-                    ))}
-                  {formCompany === 'AIL' &&
-                    DEFAULT_AIL_DOCKS.map((d) => (
-                      <option key={d} value={d}>
-                        {d} (AIL Bay)
-                      </option>
-                    ))}
-                  {formCompany === 'Both (AHPL & AIL)' &&
-                    DEFAULT_BOTH_DOCKS.map((d) => (
-                      <option key={d} value={d}>
-                        {d}
-                      </option>
-                    ))}
-                </select>
-
-                {formAssignedDock === 'Custom Dock / Dual Bay' && (
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Dock 01 & Dock 06 or Bay 03"
-                    value={formCustomDock}
-                    onChange={(e) => setFormCustomDock(e.target.value)}
-                    className="mt-2 w-full border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-2xs"
-                  />
-                )}
-
-                <p className="mt-1 text-[11px] text-slate-500">
-                  {formCompany === 'AHPL' && 'AHPL चुनने पर सिर्फ AHPL लोड रहेगा (Docks 01–04)।'}
-                  {formCompany === 'AIL' && 'AIL चुनने पर सिर्फ AIL लोड रहेगा (Docks 05–09)।'}
-                  {formCompany === 'Both (AHPL & AIL)' &&
-                    'Both (AHPL & AIL) चुनने पर सिंगल गाड़ी में दोनों कंपनियों का कंबाइंड लोड आसानी से ट्रैक और असाइन हो सकेगा (Docks 01–09)।'}
-                </p>
-              </div>
-
-              {/* Field 3: Place of Plan Location / Destination [Required Dropdown] */}
+              {/* Row 2: Place of Plan Location / Destination [Required Dropdown] */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Place of Plan Location / Destination <span className="text-rose-500">*</span>
@@ -1113,7 +994,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                 )}
               </div>
 
-              {/* Field 4: Assigned Transport / Transporter Name [Optional] & Field 5: Vehicle Type / Feet [Optional] */}
+              {/* Row 3: Assigned Transport / Transporter Name [Optional] & Vehicle Type / Feet [Optional] */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1161,7 +1042,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                 </div>
               </div>
 
-              {/* Field 6: Total Weight (KG) [Required] & Field 7: Total CFT (Cubic Feet) [Optional] */}
+              {/* Row 4: Total Weight (KG) [Required] & Total CFT (Cubic Feet) [Optional] */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
