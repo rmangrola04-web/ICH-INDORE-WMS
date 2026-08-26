@@ -15,7 +15,12 @@ export type PlanExecutionStatus =
   | 'Cancelled / Hold';
 
 export type DispatchMode =
-  | 'Dedicated Vehicle (FTL / 32ft / 24ft / 14ft / Tata Ace / Bolero)'
+  | '32 Ft SXL'
+  | '32 Ft MXL'
+  | '24 Ft'
+  | '20 Ft'
+  | '14 Ft'
+  | 'Tata Ace / Bolero'
   | 'Air Courier'
   | 'Surface Courier'
   | 'Part Load (PTL)'
@@ -25,15 +30,17 @@ export interface DailyPlanRecord {
   id: string;
   planDate: string; // YYYY-MM-DD or DD/MM/YYYY
   company: 'AHPL' | 'AIL';
-  destination: string; // Place of Plan Location / Destination (e.g. City/Hub/Depot)
-  transporterName: string; // Assigned Transport / Transporter Name
-  dispatchMode: DispatchMode; // Vehicle Type / Dispatch Mode
+  destination: string; // Place of Plan Location / Destination (Dropdown)
+  transporterName?: string; // Assigned Transport / Transporter Name (Optional)
+  dispatchMode?: DispatchMode; // Vehicle Type / Feet (Optional)
+  totalWeight: number | string; // Total Weight (KG) [Required]
+  totalCft?: number | string; // Total CFT (Cubic Feet) [Optional]
+  // Compatibility fields if present in existing records
+  status?: PlanExecutionStatus;
+  assignedDock?: string;
   totalInvoices?: number | string;
   totalBoxes?: number | string;
-  totalWeight?: number | string;
-  status: PlanExecutionStatus;
-  assignedDock: string; // Dock 01-Dock 04 for AHPL, Dock 05-Dock 09 for AIL
-  awbOrDocketNo?: string; // Remarks / Air Waybill (AWB) / Docket No
+  awbOrDocketNo?: string;
   remarks?: string;
   vehicleNo?: string;
   driverName?: string;

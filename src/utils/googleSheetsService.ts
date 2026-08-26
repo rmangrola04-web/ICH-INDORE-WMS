@@ -59,13 +59,14 @@ export function mapSheetRowToDailyPlan(item: any, idx: number): DailyPlanRecord 
     planDate: item.planDate || item.date || item.PlanDate || item.Date || new Date().toISOString().slice(0, 10),
     company: company,
     destination: item.destination || item.place || item.location || item.Destination || item.Place || '',
-    transporterName: item.transporterName || item.transporter || item.Transporter || 'MATA',
-    dispatchMode: item.dispatchMode || item.vehicleType || item.mode || item.DispatchMode || 'Dedicated Vehicle (FTL / 32ft / 24ft / 14ft / Tata Ace / Bolero)',
-    totalInvoices: item.totalInvoices || item.invoices || item.Invoices || '',
-    totalBoxes: item.totalBoxes || item.boxes || item.Boxes || '',
+    transporterName: item.transporterName || item.transporter || item.Transporter || '',
+    dispatchMode: item.dispatchMode || item.vehicleType || item.mode || item.DispatchMode || '',
     totalWeight: item.totalWeight || item.weight || item.Weight || '',
+    totalCft: item.totalCft || item.cft || item.CFT || item.TotalCft || '',
     status: status,
     assignedDock: item.assignedDock || item.dock || item.Dock || defaultDock,
+    totalInvoices: item.totalInvoices || item.invoices || item.Invoices || '',
+    totalBoxes: item.totalBoxes || item.boxes || item.Boxes || '',
     awbOrDocketNo: item.awbOrDocketNo || item.awb || item.docketNo || item.AWB || item.DocketNo || '',
     remarks: item.remarks || item.Remarks || '',
     vehicleNo: item.vehicleNo || item.VehicleNo || '',
@@ -201,6 +202,40 @@ export async function deleteLiveDailyPlan(id: string, customUrl?: string): Promi
   } catch (err: any) {
     console.error('Delete Daily Plan from Google Sheet failed:', err);
     return { success: false, error: err.message || 'Failed to delete Daily Plan from Google Sheet.' };
+  }
+}
+
+/**
+ * BULK DELETE Daily Plans permanently from Google Sheets
+ */
+export async function bulkDeleteLiveDailyPlans(ids: string[], customUrl?: string): Promise<{ success: boolean; count?: number; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  if (!ids || ids.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const payload = {
+    action: 'BULK_DELETE',
+    target: 'DAILY_PLAN',
+    sheet: 'Daily_Plan_Execution',
+    ids: ids,
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true, count: ids.length };
+  } catch (err: any) {
+    console.error('Bulk delete Daily Plans from Google Sheet failed:', err);
+    return { success: false, error: err.message || 'Failed to bulk delete Daily Plans from Google Sheet.' };
   }
 }
 
@@ -538,6 +573,11 @@ function handleRequest(e, method) {
       return createJsonResponse({ status: deletedPlan ? "success" : "not_found", message: deletedPlan ? "Plan deleted" : "Plan not found" });
     }
 
+    if (action === "DAILY_PLAN_BULK_DELETE") {
+      var deletedCount = bulkDelete(planSheet, payload.ids || []);
+      return createJsonResponse({ status: "success", count: deletedCount, message: deletedCount + " daily plans deleted" });
+    }
+
     // ==========================================
     // DOCK OPERATIONS ACTIONS
     // ==========================================
@@ -577,10 +617,17 @@ function handleRequest(e, method) {
       return createJsonResponse({ status: deleted ? "success" : "not_found", message: deleted ? "Record deleted permanently" : "Record not found" });
     }
 
-    // 7. BULK DELETE
+    // 7. BULK DELETE (Handles Dock and/or Daily Plan sheets)
     if (action === "BULK_DELETE") {
-      var deletedCount = bulkDelete(dockSheet, payload.ids || payload.tokenIds || []);
-      return createJsonResponse({ status: "success", count: deletedCount, message: deletedCount + " records deleted" });
+      var targetIds = payload.ids || payload.tokenIds || [];
+      if (payload.sheet === "Daily_Plan_Execution" || payload.target === "DAILY_PLAN" || payload.type === "DAILY_PLAN") {
+        var planDeletedCount = bulkDelete(planSheet, targetIds);
+        return createJsonResponse({ status: "success", count: planDeletedCount, message: planDeletedCount + " daily plans deleted" });
+      }
+      var deletedDockCount = bulkDelete(dockSheet, targetIds);
+      var deletedPlanCount = bulkDelete(planSheet, targetIds);
+      var totalDeleted = deletedDockCount + deletedPlanCount;
+      return createJsonResponse({ status: "success", count: totalDeleted, message: totalDeleted + " records deleted" });
     }
 
     // Default fallback
@@ -640,21 +687,20 @@ function ensurePlanHeaders(sheet) {
       "Plan ID",
       "Plan Date",
       "Company",
-      "Destination / Hub",
+      "Destination Location",
       "Transporter Name",
-      "Dispatch Mode",
-      "Total Invoices",
-      "Total Boxes",
+      "Vehicle Type / Feet",
       "Total Weight (KG)",
+      "Total CFT",
       "Execution Status",
       "Assigned Dock",
-      "AWB / Docket / Remarks",
+      "Total Invoices",
+      "Total Boxes",
+      "AWB / Remarks",
       "Vehicle No",
-      "Driver Name",
-      "Driver Mobile",
       "Updated At"
     ]);
-    sheet.getRange(1, 1, 1, 16).setFontWeight("bold").setBackground("#1e3a8a").setFontColor("#ffffff");
+    sheet.getRange(1, 1, 1, 15).setFontWeight("bold").setBackground("#1e3a8a").setFontColor("#ffffff");
     sheet.setFrozenRows(1);
   }
 }
@@ -675,17 +721,16 @@ function getAllDailyPlans(sheet) {
       destination: String(r[3] || ""),
       transporterName: String(r[4] || ""),
       dispatchMode: String(r[5] || ""),
-      totalInvoices: String(r[6] || ""),
-      totalBoxes: String(r[7] || ""),
-      totalWeight: String(r[8] || ""),
-      status: String(r[9] || "Pending"),
-      assignedDock: String(r[10] || "Dock 01"),
-      awbOrDocketNo: String(r[11] || ""),
-      remarks: String(r[11] || ""),
-      vehicleNo: String(r[12] || ""),
-      driverName: String(r[13] || ""),
-      driverMobile: String(r[14] || ""),
-      updatedAt: String(r[15] || "")
+      totalWeight: String(r[6] || ""),
+      totalCft: String(r[7] || ""),
+      status: String(r[8] || "Pending"),
+      assignedDock: String(r[9] || "Dock 01"),
+      totalInvoices: String(r[10] || ""),
+      totalBoxes: String(r[11] || ""),
+      awbOrDocketNo: String(r[12] || ""),
+      remarks: String(r[12] || ""),
+      vehicleNo: String(r[13] || ""),
+      updatedAt: String(r[14] || "")
     });
   }
   return list;
@@ -706,16 +751,15 @@ function insertDailyPlan(sheet, data) {
     company,
     data.destination || "",
     data.transporterName || "",
-    data.dispatchMode || "Dedicated Vehicle",
-    data.totalInvoices || "",
-    data.totalBoxes || "",
+    data.dispatchMode || "",
     data.totalWeight || "",
+    data.totalCft || "",
     data.status || "Pending",
     data.assignedDock || defaultDock,
+    data.totalInvoices || "",
+    data.totalBoxes || "",
     data.awbOrDocketNo || data.remarks || "",
     data.vehicleNo || "",
-    data.driverName || "",
-    data.driverMobile || "",
     fullTimestamp
   ]);
 
@@ -741,20 +785,19 @@ function updateDailyPlan(sheet, payload) {
       if (plan.planDate) sheet.getRange(rowIdx, 2).setValue(plan.planDate);
       if (plan.company) sheet.getRange(rowIdx, 3).setValue(plan.company);
       if (plan.destination) sheet.getRange(rowIdx, 4).setValue(plan.destination);
-      if (plan.transporterName) sheet.getRange(rowIdx, 5).setValue(plan.transporterName);
-      if (plan.dispatchMode) sheet.getRange(rowIdx, 6).setValue(plan.dispatchMode);
-      if (plan.totalInvoices !== undefined) sheet.getRange(rowIdx, 7).setValue(plan.totalInvoices);
-      if (plan.totalBoxes !== undefined) sheet.getRange(rowIdx, 8).setValue(plan.totalBoxes);
-      if (plan.totalWeight !== undefined) sheet.getRange(rowIdx, 9).setValue(plan.totalWeight);
-      if (plan.status) sheet.getRange(rowIdx, 10).setValue(plan.status);
-      if (plan.assignedDock) sheet.getRange(rowIdx, 11).setValue(plan.assignedDock);
+      if (plan.transporterName !== undefined) sheet.getRange(rowIdx, 5).setValue(plan.transporterName);
+      if (plan.dispatchMode !== undefined) sheet.getRange(rowIdx, 6).setValue(plan.dispatchMode);
+      if (plan.totalWeight !== undefined) sheet.getRange(rowIdx, 7).setValue(plan.totalWeight);
+      if (plan.totalCft !== undefined) sheet.getRange(rowIdx, 8).setValue(plan.totalCft);
+      if (plan.status) sheet.getRange(rowIdx, 9).setValue(plan.status);
+      if (plan.assignedDock) sheet.getRange(rowIdx, 10).setValue(plan.assignedDock);
+      if (plan.totalInvoices !== undefined) sheet.getRange(rowIdx, 11).setValue(plan.totalInvoices);
+      if (plan.totalBoxes !== undefined) sheet.getRange(rowIdx, 12).setValue(plan.totalBoxes);
       if (plan.awbOrDocketNo !== undefined || plan.remarks !== undefined) {
-        sheet.getRange(rowIdx, 12).setValue(plan.awbOrDocketNo || plan.remarks || "");
+        sheet.getRange(rowIdx, 13).setValue(plan.awbOrDocketNo || plan.remarks || "");
       }
-      if (plan.vehicleNo !== undefined) sheet.getRange(rowIdx, 13).setValue(plan.vehicleNo);
-      if (plan.driverName !== undefined) sheet.getRange(rowIdx, 14).setValue(plan.driverName);
-      if (plan.driverMobile !== undefined) sheet.getRange(rowIdx, 15).setValue(plan.driverMobile);
-      sheet.getRange(rowIdx, 16).setValue(fullTimestamp);
+      if (plan.vehicleNo !== undefined) sheet.getRange(rowIdx, 14).setValue(plan.vehicleNo);
+      sheet.getRange(rowIdx, 15).setValue(fullTimestamp);
       return true;
     }
   }

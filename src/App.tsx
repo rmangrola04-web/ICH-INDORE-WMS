@@ -42,6 +42,7 @@ import {
   addLiveDailyPlan,
   updateLiveDailyPlan,
   deleteLiveDailyPlan,
+  bulkDeleteLiveDailyPlans,
   COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS,
 } from './utils/googleSheetsService';
 
@@ -208,7 +209,7 @@ export default function App() {
         syncSummary.push(`${dockRes.value.records.length} dock records`);
       }
 
-      if (planRes.status === 'fulfilled' && planRes.value.success && planRes.value.plans.length > 0) {
+      if (planRes.status === 'fulfilled' && planRes.value.success) {
         setDailyPlans(planRes.value.plans);
         syncSummary.push(`${planRes.value.plans.length} daily plans`);
       }
@@ -275,6 +276,17 @@ export default function App() {
     if (activeUrl) {
       deleteLiveDailyPlan(id, activeUrl).catch((err) => {
         console.warn('Background Daily Plan delete error:', err);
+      });
+    }
+  };
+
+  const handleBulkDeleteDailyPlans = (ids: string[]) => {
+    setDailyPlans((prev) => prev.filter((p) => !ids.includes(p.id)));
+
+    const activeUrl = getActiveGoogleScriptUrl();
+    if (activeUrl) {
+      bulkDeleteLiveDailyPlans(ids, activeUrl).catch((err) => {
+        console.warn('Background Daily Plan bulk delete error:', err);
       });
     }
   };
@@ -717,6 +729,7 @@ export default function App() {
               onAddPlan={handleAddDailyPlan}
               onUpdatePlan={handleUpdateDailyPlan}
               onDeletePlan={handleDeleteDailyPlan}
+              onBulkDeletePlans={handleBulkDeleteDailyPlans}
               onQuickStatusChange={handleQuickPlanStatusChange}
               onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
               isSyncing={isFetchingSheet}

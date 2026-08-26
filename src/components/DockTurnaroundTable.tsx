@@ -399,9 +399,9 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
             </h2>
             <span
               id="rowCount"
-              className="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-mono"
+              className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-mono font-bold"
             >
-              {filteredRecords.length} {dict.recordsCount}
+              {records.length} Records
             </span>
             {selectedIds.length > 0 && (
               <span className="text-xs bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-md font-semibold border border-indigo-200 animate-pulse">
@@ -699,14 +699,10 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 px-4 text-center text-slate-400 text-sm">
-                    <p className="font-medium text-slate-500">
+                    <p className="font-semibold text-slate-600">
                       {records.length === 0
-                        ? lang === 'hi'
-                          ? 'कोई ऑडिट लॉग प्रविष्टि नहीं मिली। ट्रैकिंग शुरू करने के लिए नई मूवमेंट प्रविष्टि सबमिट करें।'
-                          : 'No audit log entries found. Submit a new movement entry to start tracking.'
-                        : lang === 'hi'
-                        ? 'चयनित फ़िल्टर के अनुसार कोई रिकॉर्ड नहीं मिला।'
-                        : 'No records match the active search/filters.'}
+                        ? "No records found. Click '+ Add' to create an entry."
+                        : "No records match the active search/filters."}
                     </p>
                   </td>
                 </tr>
