@@ -237,7 +237,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
       }
       const data = await response.json();
 
-      if (Array.isArray(data) && data.length > 0 && onSyncFromSheet) {
+      if (Array.isArray(data) && onSyncFromSheet) {
         const mappedRecords: DockRecord[] = data.map((item: any, idx: number) => {
           const rawStatus = (item.status || '').trim();
           const isDone = rawStatus === 'Loaded' || rawStatus === 'Unloaded' || rawStatus === 'Completed';
@@ -1324,7 +1324,7 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
                     <tbody id="dRecordsTableBody" className="divide-y divide-slate-100">
                       {filteredRecords.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="py-8 text-center text-slate-400">No records found</td>
+                          <td colSpan={12} className="py-8 text-center text-slate-400 font-semibold">No records available</td>
                         </tr>
                       ) : (
                         filteredRecords.map((r) => (

@@ -569,8 +569,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-8 text-center text-slate-400 text-xs">
-                    No matching records found for the selected filters.
+                  <td colSpan={13} className="py-8 text-center text-slate-400 font-semibold text-xs">
+                    {records.length === 0 ? 'No records available' : 'No matching records found for the selected filters.'}
                   </td>
                 </tr>
               ) : (

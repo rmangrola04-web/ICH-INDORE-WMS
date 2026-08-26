@@ -701,7 +701,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                     <ClipboardList className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                     <p className="font-semibold text-slate-600 text-sm">
                       {plans.length === 0
-                        ? "No records found. Click '+ Add' to create an entry."
+                        ? "No records available"
                         : "No records match the active search/filters."}
                     </p>
                   </td>

@@ -46,67 +46,16 @@ import {
   COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS,
 } from './utils/googleSheetsService';
 
-const LOCAL_STORAGE_KEY = 'ahpl_ail_warehouse_records_v1';
-const LOCAL_STORAGE_DOCK_KEY = 'ahpl_ail_dock_records_v1';
-const LOCAL_STORAGE_PLAN_KEY = 'ahpl_ail_daily_plans_v1';
-const LOCAL_STORAGE_LANG_KEY = 'ahpl_ail_warehouse_lang_v1';
-const LOCAL_STORAGE_TAB_KEY = 'ahpl_ail_active_tab_v2';
-
 export { GOOGLE_SCRIPT_URL };
 
 export default function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<AppTab>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_TAB_KEY);
-      if (saved && ['loading', 'plan', 'live', 'tracker', 'reports', 'analytics', 'movement'].includes(saved)) {
-        return saved as AppTab;
-      }
-    } catch (e) {
-      console.warn('Failed to parse active tab', e);
-    }
-    return 'loading';
-  });
+  const [activeTab, setActiveTab] = useState<AppTab>('loading');
 
-  // State: Initialized strictly to empty arrays (No dummy or mock data on load)
-  const [records, setRecords] = useState<MovementRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to parse local storage records', e);
-    }
-    return [];
-  });
-
-  const [dockRecords, setDockRecords] = useState<DockRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_DOCK_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to parse local storage dock records', e);
-    }
-    return [];
-  });
-
-  const [dailyPlans, setDailyPlans] = useState<DailyPlanRecord[]>(() => {
-    try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_PLAN_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.warn('Failed to parse local storage daily plans', e);
-    }
-    return [];
-  });
+  // State: Initialized strictly to empty arrays (No dummy or mock data on load, strictly network-driven)
+  const [records, setRecords] = useState<MovementRecord[]>([]);
+  const [dockRecords, setDockRecords] = useState<DockRecord[]>([]);
+  const [dailyPlans, setDailyPlans] = useState<DailyPlanRecord[]>([]);
 
   // Live Sync & Sheet State
   const [isFetchingSheet, setIsFetchingSheet] = useState<boolean>(false);
@@ -118,15 +67,7 @@ export default function App() {
   const [isCopiedCode, setIsCopiedCode] = useState<boolean>(false);
 
   // Language state (defaults to 'hi')
-  const [lang, setLang] = useState<Language>(() => {
-    try {
-      const savedLang = localStorage.getItem(LOCAL_STORAGE_LANG_KEY);
-      if (savedLang === 'en' || savedLang === 'hi') return savedLang;
-    } catch (e) {
-      console.warn('Failed to parse language preference', e);
-    }
-    return 'hi';
-  });
+  const [lang, setLang] = useState<Language>('hi');
 
   // Filters for Movement Table
   const [activeUnitFilter, setActiveUnitFilter] = useState<string>('All');
@@ -138,46 +79,19 @@ export default function App() {
   const [editingRecord, setEditingRecord] = useState<MovementRecord | null>(null);
   const [editingDockRecord, setEditingDockRecord] = useState<DockRecord | null>(null);
 
-  // Sync to localStorage
+  // ONE-TIME BROWSER CACHE PURGE ON MOUNT: Wipe out any old 154 cached entries
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(records));
+      const savedScriptUrl = localStorage.getItem('ahpl_apps_script_url');
+      localStorage.clear();
+      sessionStorage.clear();
+      if (savedScriptUrl) {
+        localStorage.setItem('ahpl_apps_script_url', savedScriptUrl);
+      }
     } catch (e) {
-      console.warn('Failed to save records', e);
+      console.warn('Storage purge error:', e);
     }
-  }, [records]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_DOCK_KEY, JSON.stringify(dockRecords));
-    } catch (e) {
-      console.warn('Failed to save dock records', e);
-    }
-  }, [dockRecords]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_PLAN_KEY, JSON.stringify(dailyPlans));
-    } catch (e) {
-      console.warn('Failed to save daily plans', e);
-    }
-  }, [dailyPlans]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_LANG_KEY, lang);
-    } catch (e) {
-      console.warn('Failed to save language preference', e);
-    }
-  }, [lang]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_TAB_KEY, activeTab);
-    } catch (e) {
-      console.warn('Failed to save active tab', e);
-    }
-  }, [activeTab]);
+  }, []);
 
   // LIVE SYNC FETCH FUNCTION (Fetches both Dock Operations & Daily Plans)
   const handleFetchFromGoogleSheet = useCallback(async (silent = false) => {

@@ -127,34 +127,42 @@ export const StockOverviewModal: React.FC<StockOverviewModalProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50 transition">
-                  <td className="p-2.5 font-mono font-bold text-slate-800">{item.code}</td>
-                  <td className="p-2.5 font-medium text-slate-800">{item.name}</td>
-                  <td className="p-2.5">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                        item.company === 'AHPL'
-                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                          : 'bg-blue-50 text-blue-700 border border-blue-200'
-                      }`}
-                    >
-                      {item.company}
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-slate-500">{item.category}</td>
-                  <td className="p-2.5 font-mono text-slate-600 font-medium">{item.locationRack}</td>
-                  <td className="p-2.5 font-mono font-bold text-slate-900">
-                    {item.currentStock.toLocaleString('en-IN')} {item.unit}
-                  </td>
-                  <td className="p-2.5">
-                    <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                      Optimal
-                    </span>
+              {filteredItems.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400 font-semibold text-xs">
+                    No records available
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition">
+                    <td className="p-2.5 font-mono font-bold text-slate-800">{item.code}</td>
+                    <td className="p-2.5 font-medium text-slate-800">{item.name}</td>
+                    <td className="p-2.5">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          item.company === 'AHPL'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                        }`}
+                      >
+                        {item.company}
+                      </span>
+                    </td>
+                    <td className="p-2.5 text-slate-500">{item.category}</td>
+                    <td className="p-2.5 font-mono text-slate-600 font-medium">{item.locationRack}</td>
+                    <td className="p-2.5 font-mono font-bold text-slate-900">
+                      {item.currentStock.toLocaleString('en-IN')} {item.unit}
+                    </td>
+                    <td className="p-2.5">
+                      <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Optimal
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -701,7 +701,7 @@ export const DockTurnaroundTable: React.FC<DockTurnaroundTableProps> = ({
                   <td colSpan={11} className="py-12 px-4 text-center text-slate-400 text-sm">
                     <p className="font-semibold text-slate-600">
                       {records.length === 0
-                        ? "No records found. Click '+ Add' to create an entry."
+                        ? "No records available"
                         : "No records match the active search/filters."}
                     </p>
                   </td>
