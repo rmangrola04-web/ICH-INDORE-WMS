@@ -42,6 +42,7 @@ import {
 import { DockRecord, CompanyUnit, SUPERVISOR_ROSTER, Language } from '../types';
 import { CSVImportModal } from './CSVImportModal';
 import { downloadSampleCSVTemplate, CSVImportResult } from '../utils/csvImportUtils';
+import { COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS } from '../utils/googleSheetsService';
 
 interface GuardSupervisorTrackerProps {
   records: DockRecord[];
@@ -134,108 +135,8 @@ export const GuardSupervisorTracker: React.FC<GuardSupervisorTrackerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  // Exact 14-Column Google Apps Script snippet
-  const APPS_SCRIPT_SNIPPET = `function doPost(e) {
-  var lock = LockService.getScriptLock();
-  lock.tryLock(10000);
-  
-  try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-    var data = JSON.parse(e.postData.contents);
-    var now = new Date().toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit', hour12: true });
-    var dateToday = new Date().toLocaleDateString("en-IN");
-    var fullTimestamp = dateToday + " " + now;
-
-    // 1. Security Gate Entry
-    if (data.action === "SECURITY_ENTRY") {
-      var tokenId = "TKN-" + Math.floor(1000 + Math.random() * 9000);
-      var activity = data.activityType || "Loading";
-      
-      sheet.appendRow([
-        tokenId,
-        fullTimestamp,
-        (data.vehicleNo || "").toUpperCase(),
-        data.driverName || "",
-        data.driverMobile || "",
-        activity,
-        data.transporter || "",
-        data.locationType || "",
-        data.cfaLocation || "",
-        data.binNo || "",
-        data.supervisor || "",
-        "", // In Dock Time
-        "", // End Time
-        "Dock Assigned" // Status
-      ]);
-
-      return ContentService.createTextOutput(JSON.stringify({ 
-        result: "success", 
-        tokenId: tokenId 
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // 2. Start In-Dock Activity (Time 2)
-    if (data.action === "START_ACTIVITY") {
-      var rows = sheet.getDataRange().getValues();
-      for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0] == data.tokenId) {
-          sheet.getRange(i + 1, 12).setValue(fullTimestamp); // Col L: In Dock Time
-          sheet.getRange(i + 1, 14).setValue("In Progress (In Dock)"); // Col N: Status
-          break;
-        }
-      }
-      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // 3. Complete Activity (Time 3)
-    if (data.action === "CLOSE_ACTIVITY") {
-      var rows = sheet.getDataRange().getValues();
-      for (var i = 1; i < rows.length; i++) {
-        if (rows[i][0] == data.tokenId) {
-          var actType = rows[i][5] || "Loading";
-          var finalStatus = actType === "Loading" ? "Loaded" : "Unloaded";
-
-          sheet.getRange(i + 1, 13).setValue(fullTimestamp); // Col M: End Time
-          sheet.getRange(i + 1, 14).setValue(finalStatus);   // Col N: Status
-          break;
-        }
-      }
-      return ContentService.createTextOutput(JSON.stringify({ result: "success" })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ result: "error", error: err.toString() })).setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function doGet() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var rows = sheet.getDataRange().getValues();
-  var result = [];
-
-  for (var i = 1; i < rows.length; i++) {
-    result.push({
-      tokenId: rows[i][0],
-      inTime: rows[i][1],
-      vehicleNo: rows[i][2],
-      driverName: rows[i][3],
-      driverMobile: rows[i][4],
-      activityType: rows[i][5],
-      transporter: rows[i][6],
-      locationType: rows[i][7],
-      cfaLocation: rows[i][8],
-      binNo: rows[i][9],
-      supervisor: rows[i][10],
-      startTime: rows[i][11],
-      closeTime: rows[i][12],
-      status: rows[i][13]
-    });
-  }
-
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-}`;
+  // Complete Google Apps Script snippet for Live Google Sheets sync
+  const APPS_SCRIPT_SNIPPET = COMPLETE_GOOGLE_APPS_SCRIPT_CODE_GS;
 
   const handleSaveWebhook = () => {
     localStorage.setItem('ahpl_apps_script_url', appsScriptUrl.trim());
@@ -1286,12 +1187,9 @@ function doGet() {
                         required
                         className="w-full border border-slate-300 rounded-lg p-2 text-sm bg-white"
                       >
-                        <option value="Ankit Dayal">Ankit Dayal</option>
-                        <option value="Sanjay Sharma">Sanjay Sharma</option>
-                        <option value="Vikas Patel">Vikas Patel</option>
-                        <option value="Rahul Verma">Rahul Verma</option>
-                        <option value="Amit Kumar">Amit Kumar</option>
-                        <option value="Suman Singh">Suman Singh</option>
+                        {SUPERVISOR_ROSTER.map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -1443,12 +1341,9 @@ function doGet() {
               className="w-full p-2.5 border-2 border-blue-600 rounded-lg text-sm font-bold text-blue-900 bg-white focus:outline-none"
             >
               <option value="ALL">-- All Supervisors --</option>
-              <option value="Ankit Dayal">Ankit Dayal</option>
-              <option value="Sanjay Sharma">Sanjay Sharma</option>
-              <option value="Vikas Patel">Vikas Patel</option>
-              <option value="Rahul Verma">Rahul Verma</option>
-              <option value="Amit Kumar">Amit Kumar</option>
-              <option value="Suman Singh">Suman Singh</option>
+              {SUPERVISOR_ROSTER.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
             </select>
             <div id="tSupervisorCardList" className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
               {mobileFilteredTasks.length === 0 ? (
@@ -1636,12 +1531,9 @@ function doGet() {
                   className="w-full p-2.5 border-2 border-blue-600 rounded-lg text-sm font-bold text-blue-900 bg-white focus:outline-none"
                 >
                   <option value="ALL">-- Show All Tasks ({mobileFilteredTasks.length}) --</option>
-                  <option value="Ankit Dayal">Ankit Dayal</option>
-                  <option value="Sanjay Sharma">Sanjay Sharma</option>
-                  <option value="Vikas Patel">Vikas Patel</option>
-                  <option value="Rahul Verma">Rahul Verma</option>
-                  <option value="Amit Kumar">Amit Kumar</option>
-                  <option value="Suman Singh">Suman Singh</option>
+                  {SUPERVISOR_ROSTER.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1819,11 +1711,9 @@ function doGet() {
                       required
                       className="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white"
                     >
-                      <option value="Ankit Dayal">Ankit Dayal</option>
-                      <option value="Sanjay Sharma">Sanjay Sharma</option>
-                      <option value="Vikas Patel">Vikas Patel</option>
-                      <option value="Rahul Verma">Rahul Verma</option>
-                      <option value="Amit Kumar">Amit Kumar</option>
+                      {SUPERVISOR_ROSTER.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

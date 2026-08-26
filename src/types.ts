@@ -43,6 +43,10 @@ export const SUPERVISOR_ROSTER = [
   'Anup Pal',
   'Sandeep Brokar',
   'Kishore Sarlam',
+  'R.K. Mishra',
+  'Ankit Dayal',
+  'Kanhaiya Patel',
+  'Rahul Mangrola',
 ] as const;
 
 export type SupervisorName = typeof SUPERVISOR_ROSTER[number] | string;

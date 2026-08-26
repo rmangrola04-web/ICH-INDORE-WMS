@@ -10,6 +10,7 @@ import {
   TransporterName,
   PodStatus,
   AttachedDocument,
+  SUPERVISOR_ROSTER,
 } from '../types';
 
 interface DockEntryFormProps {
@@ -48,12 +49,7 @@ const TRANSPORTERS = [
   'MCM',
 ];
 
-const SUPERVISORS = [
-  'Suman Singh',
-  'Anup Pal',
-  'Sandeep Brokar',
-  'Kishore Sarlam',
-];
+const SUPERVISORS = SUPERVISOR_ROSTER;
 
 const POD_STATUS_OPTIONS = [
   { value: 'POD Clean (No Incidence)', label: '✔ POD Clean (No Incidence)' },
