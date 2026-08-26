@@ -1,4 +1,5 @@
-export type CompanyUnit = 'AHPL' | 'AIL' | 'AHPL & AIL';
+export type CompanyUnit = 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' | 'AHPL & AIL';
+export type CompanyPlan = 'AHPL' | 'AIL' | 'Both (AHPL & AIL)';
 export type MovementType = 'Inbound' | 'Outbound';
 export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
@@ -29,15 +30,15 @@ export type DispatchMode =
 export interface DailyPlanRecord {
   id: string;
   planDate: string; // YYYY-MM-DD or DD/MM/YYYY
-  company: 'AHPL' | 'AIL';
+  company: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' | string;
   destination: string; // Place of Plan Location / Destination (Dropdown)
   transporterName?: string; // Assigned Transport / Transporter Name (Optional)
   dispatchMode?: DispatchMode; // Vehicle Type / Feet (Optional)
   totalWeight: number | string; // Total Weight (KG) [Required]
   totalCft?: number | string; // Total CFT (Cubic Feet) [Optional]
+  assignedDock?: string; // Assigned Dock Bay (Docks 01-04 for AHPL, Docks 05-09 for AIL, All/Dual for Both)
   // Compatibility fields if present in existing records
   status?: PlanExecutionStatus;
-  assignedDock?: string;
   totalInvoices?: number | string;
   totalBoxes?: number | string;
   awbOrDocketNo?: string;

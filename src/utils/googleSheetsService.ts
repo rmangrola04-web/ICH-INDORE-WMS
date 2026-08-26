@@ -34,9 +34,22 @@ export function setActiveGoogleScriptUrl(url: string): void {
  * Helper to map raw Google Sheet row or object to DailyPlanRecord
  */
 export function mapSheetRowToDailyPlan(item: any, idx: number): DailyPlanRecord {
-  const rawComp = (item.company || item.Company || item.unit || item.Unit || 'AHPL').toUpperCase();
-  const company: 'AHPL' | 'AIL' = rawComp.includes('AIL') ? 'AIL' : 'AHPL';
-  const defaultDock = company === 'AIL' ? 'Dock 05' : 'Dock 01';
+  const rawComp = (item.company || item.Company || item.unit || item.Unit || 'AHPL').toString().trim();
+  let company: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' = 'AHPL';
+  if (
+    rawComp.toUpperCase().includes('BOTH') ||
+    (rawComp.toUpperCase().includes('AHPL') && rawComp.toUpperCase().includes('AIL')) ||
+    rawComp === 'Both' ||
+    rawComp === 'AHPL & AIL'
+  ) {
+    company = 'Both (AHPL & AIL)';
+  } else if (rawComp.toUpperCase().includes('AIL')) {
+    company = 'AIL';
+  } else {
+    company = 'AHPL';
+  }
+
+  const defaultDock = company === 'Both (AHPL & AIL)' ? 'Dock 01 & Dock 05' : company === 'AIL' ? 'Dock 05' : 'Dock 01';
 
   let rawStatus = item.status || item.Status || 'Pending';
   const validStatuses: PlanExecutionStatus[] = [
@@ -742,8 +755,8 @@ function insertDailyPlan(sheet, data) {
   var fullTimestamp = dateToday + " " + now;
 
   var planId = data.id || ("PLAN-" + Math.floor(1000 + Math.random() * 9000));
-  var company = (data.company || "AHPL").toUpperCase();
-  var defaultDock = company === "AIL" ? "Dock 05" : "Dock 01";
+  var company = data.company || "AHPL";
+  var defaultDock = company === "AIL" ? "Dock 05" : (company === "Both (AHPL & AIL)" ? "Dock 01 & Dock 05" : "Dock 01");
 
   sheet.appendRow([
     planId,

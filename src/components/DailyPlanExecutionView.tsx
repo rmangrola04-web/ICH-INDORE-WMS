@@ -95,6 +95,25 @@ export const VEHICLE_TYPE_OPTIONS: string[] = [
   'Part Load (PTL)',
 ];
 
+export const DEFAULT_AHPL_DOCKS: string[] = ['Dock 01', 'Dock 02', 'Dock 03', 'Dock 04'];
+export const DEFAULT_AIL_DOCKS: string[] = ['Dock 05', 'Dock 06', 'Dock 07', 'Dock 08', 'Dock 09'];
+export const DEFAULT_BOTH_DOCKS: string[] = [
+  'Dock 01 & Dock 05 (Dual Bay)',
+  'Dock 02 & Dock 06 (Dual Bay)',
+  'Dock 03 & Dock 07 (Dual Bay)',
+  'Dock 04 & Dock 08 (Dual Bay)',
+  'Dock 01',
+  'Dock 02',
+  'Dock 03',
+  'Dock 04',
+  'Dock 05',
+  'Dock 06',
+  'Dock 07',
+  'Dock 08',
+  'Dock 09',
+  'Custom Dock / Dual Bay',
+];
+
 export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   plans,
   lang,
@@ -113,7 +132,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const masterCheckboxRef = useRef<HTMLInputElement>(null);
 
   // Filters State
-  const [companyFilter, setCompanyFilter] = useState<'All' | 'AHPL' | 'AIL'>('All');
+  const [companyFilter, setCompanyFilter] = useState<'All' | 'AHPL' | 'AIL' | 'Both (AHPL & AIL)'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string>('All');
   const [customDate, setCustomDate] = useState<string>('');
@@ -125,7 +144,9 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   // Exact Form Fields Required
   const todayStr = new Date().toISOString().slice(0, 10);
   const [formPlanDate, setFormPlanDate] = useState<string>(todayStr);
-  const [formCompany, setFormCompany] = useState<'AHPL' | 'AIL'>('AHPL');
+  const [formCompany, setFormCompany] = useState<'AHPL' | 'AIL' | 'Both (AHPL & AIL)'>('AHPL');
+  const [formAssignedDock, setFormAssignedDock] = useState<string>('Dock 01');
+  const [formCustomDock, setFormCustomDock] = useState<string>('');
   const [formDestination, setFormDestination] = useState<string>(DEFAULT_PLAN_LOCATIONS[0]);
   const [formCustomDestination, setFormCustomDestination] = useState<string>('');
   const [formTransporter, setFormTransporter] = useState<string>('MATA');
@@ -134,11 +155,32 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const [formWeight, setFormWeight] = useState<string>('');
   const [formCft, setFormCft] = useState<string>('');
 
+  // Handle Company Selection Change in Modal to adapt Docks dynamically
+  const handleCompanyChange = (newComp: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)') => {
+    setFormCompany(newComp);
+    if (newComp === 'AHPL') {
+      if (!DEFAULT_AHPL_DOCKS.includes(formAssignedDock)) {
+        setFormAssignedDock('Dock 01');
+      }
+    } else if (newComp === 'AIL') {
+      if (!DEFAULT_AIL_DOCKS.includes(formAssignedDock)) {
+        setFormAssignedDock('Dock 05');
+      }
+    } else {
+      // Both (AHPL & AIL)
+      if (!DEFAULT_BOTH_DOCKS.includes(formAssignedDock)) {
+        setFormAssignedDock('Dock 01 & Dock 05 (Dual Bay)');
+      }
+    }
+  };
+
   // Open Add Modal
   const handleOpenAddModal = () => {
     setEditingPlan(null);
     setFormPlanDate(todayStr);
     setFormCompany('AHPL');
+    setFormAssignedDock('Dock 01');
+    setFormCustomDock('');
     setFormDestination(DEFAULT_PLAN_LOCATIONS[0]);
     setFormCustomDestination('');
     setFormTransporter('MATA');
@@ -153,7 +195,33 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const handleOpenEditModal = (plan: DailyPlanRecord) => {
     setEditingPlan(plan);
     setFormPlanDate(plan.planDate || todayStr);
-    setFormCompany(plan.company || 'AHPL');
+    
+    const comp: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' =
+      plan.company === 'Both (AHPL & AIL)' ||
+      plan.company?.toLowerCase().includes('both') ||
+      plan.company?.includes('&')
+        ? 'Both (AHPL & AIL)'
+        : plan.company === 'AIL'
+        ? 'AIL'
+        : 'AHPL';
+    setFormCompany(comp);
+
+    const dock = plan.assignedDock || (comp === 'AIL' ? 'Dock 05' : comp === 'Both (AHPL & AIL)' ? 'Dock 01 & Dock 05 (Dual Bay)' : 'Dock 01');
+    if (comp === 'AHPL') {
+      setFormAssignedDock(DEFAULT_AHPL_DOCKS.includes(dock) ? dock : 'Dock 01');
+      setFormCustomDock('');
+    } else if (comp === 'AIL') {
+      setFormAssignedDock(DEFAULT_AIL_DOCKS.includes(dock) ? dock : 'Dock 05');
+      setFormCustomDock('');
+    } else {
+      if (DEFAULT_BOTH_DOCKS.includes(dock)) {
+        setFormAssignedDock(dock);
+        setFormCustomDock('');
+      } else {
+        setFormAssignedDock('Custom Dock / Dual Bay');
+        setFormCustomDock(dock);
+      }
+    }
 
     if (DEFAULT_PLAN_LOCATIONS.includes(plan.destination)) {
       setFormDestination(plan.destination);
@@ -204,11 +272,17 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
         ? formCustomTransporter.trim() || 'OTHER'
         : formTransporter;
 
+    const resolvedDock =
+      formAssignedDock === 'Custom Dock / Dual Bay'
+        ? formCustomDock.trim() || (formCompany === 'AIL' ? 'Dock 05' : formCompany === 'Both (AHPL & AIL)' ? 'Dock 01 & Dock 05' : 'Dock 01')
+        : formAssignedDock;
+
     if (editingPlan) {
       const updated: DailyPlanRecord = {
         ...editingPlan,
         planDate: formPlanDate,
         company: formCompany,
+        assignedDock: resolvedDock,
         destination: resolvedDestination,
         transporterName: resolvedTransporter || undefined,
         dispatchMode: formVehicleType || undefined,
@@ -221,6 +295,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
       onAddPlan({
         planDate: formPlanDate,
         company: formCompany,
+        assignedDock: resolvedDock,
         destination: resolvedDestination,
         transporterName: resolvedTransporter || undefined,
         dispatchMode: formVehicleType || undefined,
@@ -236,8 +311,19 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   const filteredPlans = useMemo(() => {
     return plans.filter((plan) => {
       // Company Filter
-      if (companyFilter !== 'All' && plan.company !== companyFilter) {
-        return false;
+      if (companyFilter !== 'All') {
+        const isBothPlan =
+          plan.company === 'Both (AHPL & AIL)' ||
+          plan.company?.toLowerCase().includes('both') ||
+          plan.company?.includes('&');
+
+        if (companyFilter === 'Both (AHPL & AIL)') {
+          if (!isBothPlan) return false;
+        } else if (companyFilter === 'AHPL') {
+          if (plan.company !== 'AHPL') return false;
+        } else if (companyFilter === 'AIL') {
+          if (plan.company !== 'AIL') return false;
+        }
       }
 
       // Date Filter
@@ -258,6 +344,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
           plan.destination?.toLowerCase().includes(q) ||
           plan.transporterName?.toLowerCase().includes(q) ||
           plan.dispatchMode?.toLowerCase().includes(q) ||
+          plan.assignedDock?.toLowerCase().includes(q) ||
+          plan.company?.toLowerCase().includes(q) ||
           String(plan.totalWeight || '').toLowerCase().includes(q) ||
           String(plan.totalCft || '').toLowerCase().includes(q) ||
           plan.id?.toLowerCase().includes(q);
@@ -495,10 +583,16 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
               {lang === 'hi' ? 'कुल दैनिक प्लान' : 'Total Daily Plans'}
             </p>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{plans.length}</h3>
-            <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-medium">
-              <span className="text-blue-600 font-bold">AHPL: {plans.filter((p) => p.company === 'AHPL').length}</span>
-              <span>•</span>
-              <span className="text-emerald-600 font-bold">AIL: {plans.filter((p) => p.company === 'AIL').length}</span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-medium">
+              <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                AHPL: {plans.filter((p) => p.company === 'AHPL').length}
+              </span>
+              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                AIL: {plans.filter((p) => p.company === 'AIL').length}
+              </span>
+              <span className="text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                Both: {plans.filter((p) => p.company === 'Both (AHPL & AIL)' || p.company?.toLowerCase().includes('both') || p.company?.includes('&')).length}
+              </span>
             </div>
           </div>
           <div className="bg-slate-100 p-3 rounded-xl text-slate-600">
@@ -623,23 +717,29 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
           {/* Right Filters */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {/* Company Filter Pill */}
-            <div className="flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
-              {(['All', 'AHPL', 'AIL'] as const).map((comp) => (
+            <div className="flex flex-wrap items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
+              {(['All', 'AHPL', 'AIL', 'Both (AHPL & AIL)'] as const).map((comp) => (
                 <button
                   key={comp}
                   type="button"
                   onClick={() => setCompanyFilter(comp)}
-                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-md font-bold transition cursor-pointer text-xs ${
                     companyFilter === comp
                       ? comp === 'AHPL'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white shadow-2xs'
                         : comp === 'AIL'
-                        ? 'bg-emerald-600 text-white'
-                        : 'bg-indigo-600 text-white'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : comp === 'Both (AHPL & AIL)'
+                        ? 'bg-purple-600 text-white shadow-2xs'
+                        : 'bg-indigo-600 text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  {comp === 'All' ? (lang === 'hi' ? 'सभी इकाइयाँ' : 'All Units') : comp}
+                  {comp === 'All'
+                    ? (lang === 'hi' ? 'सभी इकाइयाँ' : 'All Units')
+                    : comp === 'Both (AHPL & AIL)'
+                    ? 'Both'
+                    : comp}
                 </button>
               ))}
             </div>
@@ -685,10 +785,10 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                   </div>
                 </th>
                 <th className="py-3 px-3.5">Date</th>
-                <th className="py-3 px-3.5">Company (AHPL / AIL)</th>
+                <th className="py-3 px-3.5">Company / Unit</th>
                 <th className="py-3 px-3.5">Destination Location</th>
                 <th className="py-3 px-3.5">Transporter</th>
-                <th className="py-3 px-3.5">Vehicle Type / Feet</th>
+                <th className="py-3 px-3.5">Vehicle & Dock Bay</th>
                 <th className="py-3 px-3.5">Weight (KG)</th>
                 <th className="py-3 px-3.5">CFT</th>
                 <th className="py-3 px-3.5 text-right">Actions</th>
@@ -709,6 +809,11 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
               ) : (
                 filteredPlans.map((plan) => {
                   const isSelected = selectedPlanIds.includes(plan.id);
+                  const isBoth =
+                    plan.company === 'Both (AHPL & AIL)' ||
+                    plan.company?.toLowerCase().includes('both') ||
+                    plan.company?.includes('&');
+
                   return (
                     <tr
                       key={plan.id}
@@ -739,17 +844,24 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                         <div className="text-[10px] text-slate-400 font-normal">{plan.id}</div>
                       </td>
 
-                      {/* 2. Company (AHPL / AIL) */}
+                      {/* 2. Company Badge */}
                       <td className="py-3.5 px-3.5">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                            plan.company === 'AHPL'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          }`}
-                        >
-                          {plan.company}
-                        </span>
+                        {isBoth ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-purple-100 via-indigo-100 to-pink-100 text-purple-900 border border-purple-300 shadow-2xs">
+                            <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse shrink-0"></span>
+                            Both (AHPL & AIL)
+                          </span>
+                        ) : plan.company === 'AIL' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                            AIL
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+                            AHPL
+                          </span>
+                        )}
                       </td>
 
                       {/* 3. Destination Location */}
@@ -769,9 +881,17 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                         )}
                       </td>
 
-                      {/* 5. Vehicle Type / Feet */}
+                      {/* 5. Vehicle Type & Assigned Dock */}
                       <td className="py-3.5 px-3.5">
-                        {renderVehicleBadge(plan.dispatchMode)}
+                        <div className="space-y-1">
+                          <div>{renderVehicleBadge(plan.dispatchMode)}</div>
+                          {plan.assignedDock && (
+                            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                              <Building2 className="w-3 h-3 text-indigo-600 shrink-0" />
+                              <span>{plan.assignedDock}</span>
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* 6. Weight (KG) */}
@@ -884,13 +1004,78 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                   <select
                     required
                     value={formCompany}
-                    onChange={(e) => setFormCompany(e.target.value as 'AHPL' | 'AIL')}
-                    className="w-full border border-blue-300 rounded-xl px-3 py-2 text-sm bg-blue-50/50 font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-2xs cursor-pointer"
+                    onChange={(e) => handleCompanyChange(e.target.value as 'AHPL' | 'AIL' | 'Both (AHPL & AIL)')}
+                    className={`w-full border rounded-xl px-3 py-2 text-sm font-bold focus:ring-2 focus:outline-none shadow-2xs cursor-pointer ${
+                      formCompany === 'Both (AHPL & AIL)'
+                        ? 'border-purple-300 bg-purple-50 text-purple-900 focus:ring-purple-500'
+                        : formCompany === 'AIL'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-900 focus:ring-emerald-500'
+                        : 'border-blue-300 bg-blue-50 text-blue-900 focus:ring-blue-500'
+                    }`}
                   >
                     <option value="AHPL">AHPL</option>
                     <option value="AIL">AIL</option>
+                    <option value="Both (AHPL & AIL)">Both (AHPL & AIL)</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Field 2.5: Assigned Dock Bay (Dynamic based on Company selection) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Assigned Dock Bay <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] font-medium text-slate-500">
+                    {formCompany === 'AHPL' && '(Docks 01–04 for AHPL)'}
+                    {formCompany === 'AIL' && '(Docks 05–09 for AIL)'}
+                    {formCompany === 'Both (AHPL & AIL)' && '(All Docks 01–09 or Dual Bays)'}
+                  </span>
+                </div>
+
+                <select
+                  required
+                  value={formAssignedDock}
+                  onChange={(e) => setFormAssignedDock(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-2xs cursor-pointer"
+                >
+                  {formCompany === 'AHPL' &&
+                    DEFAULT_AHPL_DOCKS.map((d) => (
+                      <option key={d} value={d}>
+                        {d} (AHPL Bay)
+                      </option>
+                    ))}
+                  {formCompany === 'AIL' &&
+                    DEFAULT_AIL_DOCKS.map((d) => (
+                      <option key={d} value={d}>
+                        {d} (AIL Bay)
+                      </option>
+                    ))}
+                  {formCompany === 'Both (AHPL & AIL)' &&
+                    DEFAULT_BOTH_DOCKS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                </select>
+
+                {formAssignedDock === 'Custom Dock / Dual Bay' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Dock 01 & Dock 06 or Bay 03"
+                    value={formCustomDock}
+                    onChange={(e) => setFormCustomDock(e.target.value)}
+                    className="mt-2 w-full border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-2xs"
+                  />
+                )}
+
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {formCompany === 'AHPL' && 'AHPL चुनने पर सिर्फ AHPL लोड रहेगा (Docks 01–04)।'}
+                  {formCompany === 'AIL' && 'AIL चुनने पर सिर्फ AIL लोड रहेगा (Docks 05–09)।'}
+                  {formCompany === 'Both (AHPL & AIL)' &&
+                    'Both (AHPL & AIL) चुनने पर सिंगल गाड़ी में दोनों कंपनियों का कंबाइंड लोड आसानी से ट्रैक और असाइन हो सकेगा (Docks 01–09)।'}
+                </p>
               </div>
 
               {/* Field 3: Place of Plan Location / Destination [Required Dropdown] */}
