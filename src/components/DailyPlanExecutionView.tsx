@@ -43,6 +43,7 @@ interface DailyPlanExecutionViewProps {
   onUpdatePlan: (plan: DailyPlanRecord) => void;
   onDeletePlan: (id: string) => void;
   onBulkDeletePlans?: (ids: string[]) => void;
+  onPlaceVehicleToDock?: (plan: DailyPlanRecord) => void;
   onQuickStatusChange?: (id: string, newStatus: any) => void;
   onSyncGoogleSheets?: () => void;
   isSyncing?: boolean;
@@ -112,6 +113,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   onUpdatePlan,
   onDeletePlan,
   onBulkDeletePlans,
+  onPlaceVehicleToDock,
   onSyncGoogleSheets,
   isSyncing = false,
   lastSyncTime,
@@ -198,6 +200,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
 
   // Exact Form Fields Required
   const todayStr = new Date().toISOString().slice(0, 10);
+  const [formDeliveryNo, setFormDeliveryNo] = useState<string>('');
+  const [formCode, setFormCode] = useState<string>('');
   const [formPlanDate, setFormPlanDate] = useState<string>(todayStr);
   const [formCompany, setFormCompany] = useState<'AHPL' | 'AIL' | 'Both (AHPL & AIL)'>('AHPL');
   const [formDestination, setFormDestination] = useState<string>(DEFAULT_PLAN_LOCATIONS[0]);
@@ -427,6 +431,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   // Open Add Modal
   const handleOpenAddModal = () => {
     setEditingPlan(null);
+    setFormDeliveryNo(`DEL-${Date.now().toString().slice(-5)}`);
+    setFormCode('AHPL-01');
     setFormPlanDate(todayStr);
     setFormCompany('AHPL');
     setFormDestination(DEFAULT_PLAN_LOCATIONS[0]);
@@ -442,6 +448,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
   // Open Edit Modal
   const handleOpenEditModal = (plan: DailyPlanRecord) => {
     setEditingPlan(plan);
+    setFormDeliveryNo(plan.deliveryNo || plan.id);
+    setFormCode(plan.code || (plan.company === 'AIL' ? 'AIL-02' : plan.company === 'AHPL' ? 'AHPL-01' : 'COMB-03'));
     setFormPlanDate(plan.planDate || todayStr);
     
     const comp: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' =
@@ -506,6 +514,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
     if (editingPlan) {
       const updated: DailyPlanRecord = {
         ...editingPlan,
+        deliveryNo: formDeliveryNo.trim() || editingPlan.deliveryNo || editingPlan.id,
+        code: formCode.trim() || editingPlan.code,
         planDate: formPlanDate,
         company: formCompany,
         destination: resolvedDestination,
@@ -518,6 +528,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
       onUpdatePlan(updated);
     } else {
       onAddPlan({
+        deliveryNo: formDeliveryNo.trim() || `DEL-${Date.now().toString().slice(-5)}`,
+        code: formCode.trim() || (formCompany === 'AIL' ? 'AIL-02' : formCompany === 'AHPL' ? 'AHPL-01' : 'COMB-03'),
         planDate: formPlanDate,
         company: formCompany,
         destination: resolvedDestination,
@@ -723,20 +735,20 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-inner">
+            <div className="bg-slate-800 text-white p-2.5 rounded-xl shadow-inner">
               <ClipboardList className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                <span>Daily Plan Execution</span>
-                <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-0.5 rounded-full border border-indigo-200 font-bold font-mono">
+                <span>Plan Received AHPL & AIL</span>
+                <span className="text-xs bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full border border-slate-300 font-bold font-mono">
                   {plans.length} Records
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 font-medium">
                 {lang === 'hi'
-                  ? 'दैनिक डिस्पैच योजना का प्रबंधन, स्थान, ट्रांसपोर्टर और भार विवरण।'
-                  : 'Manage daily dispatch intake plans, destinations, vehicle allocations, weights, and CFT volume.'}
+                  ? 'डिलीवरी संख्या, कोड, गंतव्य, वजन, CFT, वाहन प्रकार एवं ट्रांसपोर्टर सूची।'
+                  : 'Delivery No, Code, Destination, Weight, CFT, Vehicle Type & Transporter Sheet'}
               </p>
             </div>
           </div>
@@ -787,10 +799,10 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
               setUploadSuccessCount(null);
               setIsCsvModalOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs sm:text-sm font-bold border border-emerald-300 transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-bold border border-slate-300 transition cursor-pointer shadow-2xs"
             title="Upload CSV file to import multiple daily plans at once"
           >
-            <Upload className="w-4 h-4 text-emerald-600" />
+            <Upload className="w-4 h-4 text-slate-700" />
             <span>{lang === 'hi' ? 'CSV प्लान अपलोड' : 'Upload CSV Plan'}</span>
           </button>
 
@@ -806,34 +818,35 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
           <button
             type="button"
             onClick={handleOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-slate-800/20 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>+ {lang === 'hi' ? 'नया डेली प्लान जोड़ें' : 'Add New Daily Plan'}</span>
+            <span>+ {lang === 'hi' ? 'नया डेली प्लान जोड़ें' : 'Add Plan Entry'}</span>
           </button>
         </div>
       </div>
 
-      {/* OCR PHOTO SCANNER CARD (Section 3 Matching Layout) */}
-      <div className="bg-white p-5 rounded-2xl border border-[#E2DCCE] shadow-xs space-y-4">
+      {/* OCR PHOTO SCANNER CARD */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
         <div className="flex flex-wrap justify-between items-center gap-4 pb-3 border-b border-slate-100">
           <div>
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Camera className="w-4 h-4 text-amber-800" />
-              <span>{lang === 'hi' ? 'डिस्पैच प्लान एवं चालान फोटो OCR स्कैनर' : 'Dispatch Plan & Challan Photo OCR Scanner'}</span>
+              <Camera className="w-4 h-4 text-slate-700" />
+              <span>{lang === 'hi' ? 'प्लान फोटो स्कैन (OCR)' : 'Scan Plan Photo (OCR)'}</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {lang === 'hi'
-                ? 'कागजी प्लान फोटो कैप्चर करें — टेक्स्ट स्वचालित रूप से डॉक और गूगल शीट में सिंक होता है'
-                : 'Capture plan paper photo — text automatically syncs into docks & Google Sheets'}
+                ? 'कागजी प्लान फोटो कैप्चर करें — डिलीवरी संख्या, कोड, गंतव्य एवं वजन स्वतः लोड होता है'
+                : 'Capture plan paper photo — Delivery No, Code, Destination, Weight, CFT & Transporter auto-extracted'}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="bg-stone-800 hover:bg-stone-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs cursor-pointer transition">
-              <Scan className="w-4 h-4 text-amber-300" />
-              <span>{lang === 'hi' ? 'फोटो लें / प्लान अपलोड करें' : 'Take Photo / Upload Plan'}</span>
+            <label className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm cursor-pointer transition">
+              <Camera className="w-4 h-4 text-emerald-400" />
+              <span>{lang === 'hi' ? 'फोटो स्कैन करें (OCR)' : 'Scan Plan Photo (OCR)'}</span>
               <input
+                id="planCameraInput"
                 type="file"
                 ref={ocrInputRef}
                 accept="image/*"
@@ -844,8 +857,8 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
             </label>
 
             {isScanningOcr && (
-              <div className="text-xs text-amber-900 font-semibold flex items-center gap-1.5 animate-pulse bg-amber-50 px-3 py-2 rounded-xl border border-amber-200">
-                <Loader2 className="w-4 h-4 animate-spin text-amber-700" />
+              <div id="ocrSpinner" className="text-xs text-slate-800 font-semibold flex items-center gap-1.5 animate-pulse bg-slate-200 px-3 py-2 rounded-xl border border-slate-300">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
                 <span>{lang === 'hi' ? 'OCR स्कैनिंग जारी है...' : 'Scanning OCR...'}</span>
               </div>
             )}
@@ -858,93 +871,48 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
             <span>{ocrSuccessMsg}</span>
           </div>
         )}
-
-        <div className="bg-[#FBF9F5] p-3.5 rounded-xl border border-[#EAE4D5] text-xs text-slate-600 space-y-1">
-          <p className="font-bold text-slate-800">{lang === 'hi' ? 'फोटो ऑटो-सिंक कैसे काम करता है:' : 'How Photo Auto-Sync Works:'}</p>
-          <p>{lang === 'hi' ? '1. ऊपर दिए गए बटन पर टैप करें और अपने चालान / डिस्पैच शेड्यूल की फोटो लें।' : '1. Tap the button above and click a photo of your paper Challan / Dispatch Schedule.'}</p>
-          <p>{lang === 'hi' ? '2. सिस्टम वाहन संख्या, ट्रांसपोर्टर, स्थान एवं वजन की पहचान करता है।' : '2. The built-in AI will detect Vehicle Plate, Transporter, Invoices and Location.'}</p>
-          <p>{lang === 'hi' ? '3. यह तुरंत प्लान टेबल में रिकॉर्ड दर्ज करता है और गूगल शीट में सिंक करता है।' : '3. It instantly logs the record into your Dock Table and syncs to Google Sheets.'}</p>
-        </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Total Plans */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              {lang === 'hi' ? 'कुल दैनिक प्लान' : 'Total Daily Plans'}
-            </p>
-            <h3 className="text-2xl font-black text-slate-800 mt-1">{plans.length}</h3>
-            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] font-medium">
-              <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                AHPL: {plans.filter((p) => p.company === 'AHPL').length}
-              </span>
-              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                AIL: {plans.filter((p) => p.company === 'AIL').length}
-              </span>
-              <span className="text-purple-700 font-bold bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                Both: {plans.filter((p) => p.company === 'Both (AHPL & AIL)' || p.company?.toLowerCase().includes('both') || p.company?.includes('&')).length}
-              </span>
-            </div>
-          </div>
-          <div className="bg-slate-100 p-3 rounded-xl text-slate-600">
-            <ClipboardList className="w-6 h-6" />
-          </div>
+      {/* Summary Totals Strip (Exact IDs matching user prompt) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* 1. Total Deliveries */}
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+          <p className="text-[10px] font-bold text-slate-500 uppercase">
+            {lang === 'hi' ? 'कुल डिलीवरी' : 'Total Deliveries'}
+          </p>
+          <h3 id="sumDeliveryCount" className="text-lg font-black text-slate-800 mt-0.5">
+            {plans.length} Items
+          </h3>
         </div>
 
-        {/* 2. Total Weight Scheduled */}
-        <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-blue-700 uppercase tracking-wider">
-              {lang === 'hi' ? 'कुल निर्धारित वजन' : 'Total Planned Weight'}
-            </p>
-            <h3 className="text-2xl font-black text-blue-900 mt-1">
-              {totalWeightKg.toLocaleString('en-IN')} <span className="text-sm font-bold text-blue-600">KG</span>
-            </h3>
-            <p className="text-[11px] text-blue-600 font-medium mt-1">
-              {plans.length > 0 ? `${(totalWeightKg / 1000).toFixed(1)} Metric Tons` : '0 Metric Tons'}
-            </p>
-          </div>
-          <div className="bg-blue-50 p-3 rounded-xl text-blue-600 border border-blue-200">
-            <Scale className="w-6 h-6" />
-          </div>
+        {/* 2. Total Weight */}
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+          <p className="text-[10px] font-bold text-slate-500 uppercase">
+            {lang === 'hi' ? 'कुल वजन' : 'Total Weight'}
+          </p>
+          <h3 id="sumTotalWeight" className="text-lg font-black text-slate-800 mt-0.5">
+            {totalWeightKg.toFixed(2)} Kg
+          </h3>
         </div>
 
-        {/* 3. Total CFT Volume */}
-        <div className="bg-white p-4 rounded-xl border border-purple-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-purple-700 uppercase tracking-wider">
-              {lang === 'hi' ? 'कुल वॉल्यूम (CFT)' : 'Total Volume (CFT)'}
-            </p>
-            <h3 className="text-2xl font-black text-purple-900 mt-1">
-              {totalCftSum.toLocaleString('en-IN')} <span className="text-sm font-bold text-purple-600">CFT</span>
-            </h3>
-            <p className="text-[11px] text-purple-600 font-medium mt-1">
-              Cubic Feet Allocation
-            </p>
-          </div>
-          <div className="bg-purple-50 p-3 rounded-xl text-purple-600 border border-purple-200">
-            <Box className="w-6 h-6" />
-          </div>
+        {/* 3. Total CFT */}
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+          <p className="text-[10px] font-bold text-slate-500 uppercase">
+            {lang === 'hi' ? 'कुल वॉल्यूम (CFT)' : 'Total CFT'}
+          </p>
+          <h3 id="sumTotalCFT" className="text-lg font-black text-indigo-700 mt-0.5">
+            {totalCftSum.toFixed(2)}
+          </h3>
         </div>
 
-        {/* 4. Active Locations */}
-        <div className="bg-white p-4 rounded-xl border border-emerald-200 shadow-xs flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">
-              {lang === 'hi' ? 'गंतव्य स्थान' : 'Destinations Covered'}
-            </p>
-            <h3 className="text-2xl font-black text-emerald-800 mt-1">
-              {new Set(plans.map((p) => p.destination)).size}
-            </h3>
-            <p className="text-[11px] text-emerald-600 font-medium mt-1">
-              Unique Hubs & Depots
-            </p>
-          </div>
-          <div className="bg-emerald-50 p-3 rounded-xl text-emerald-600 border border-emerald-200">
-            <MapPin className="w-6 h-6" />
-          </div>
+        {/* 4. Unique Stations */}
+        <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+          <p className="text-[10px] font-bold text-slate-500 uppercase">
+            {lang === 'hi' ? 'गंतव्य स्टेशन्स' : 'Unique Stations'}
+          </p>
+          <h3 id="sumUniqueDest" className="text-lg font-black text-emerald-700 mt-0.5">
+            {new Set(plans.map((p) => p.destination)).size} Stations
+          </h3>
         </div>
       </div>
 
@@ -1072,19 +1040,19 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                       ref={masterCheckboxRef}
                       checked={isAllSelected}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                      className="w-4 h-4 text-slate-800 rounded border-slate-300 focus:ring-slate-500 cursor-pointer accent-slate-800"
                       title={isAllSelected ? 'Deselect All' : 'Select All'}
                     />
                   </div>
                 </th>
-                <th className="py-3 px-3.5">Date</th>
-                <th className="py-3 px-3.5">Company / Unit</th>
-                <th className="py-3 px-3.5">Destination Location</th>
-                <th className="py-3 px-3.5">Transporter</th>
-                <th className="py-3 px-3.5">Vehicle & Dock Bay</th>
-                <th className="py-3 px-3.5">Weight (KG)</th>
+                <th className="py-3 px-3.5">Delivery No.</th>
+                <th className="py-3 px-3.5">Code</th>
+                <th className="py-3 px-3.5">Destination</th>
+                <th className="py-3 px-3.5">Weight (Kg)</th>
                 <th className="py-3 px-3.5">CFT</th>
-                <th className="py-3 px-3.5 text-right">Actions</th>
+                <th className="py-3 px-3.5">Vehicle Type</th>
+                <th className="py-3 px-3.5">Transporter Name</th>
+                <th className="py-3 px-3.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1112,7 +1080,7 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                       key={plan.id}
                       className={`transition-colors group ${
                         isSelected
-                          ? 'bg-indigo-50/70 hover:bg-indigo-50 text-slate-900 font-medium'
+                          ? 'bg-slate-100 text-slate-900 font-medium'
                           : 'hover:bg-slate-50/80 text-slate-700'
                       }`}
                     >
@@ -1126,46 +1094,78 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                             type="checkbox"
                             checked={isSelected}
                             onChange={(e) => handleToggleRow(plan.id, e)}
-                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer accent-indigo-600"
+                            className="w-4 h-4 text-slate-800 rounded border-slate-300 focus:ring-slate-500 cursor-pointer accent-slate-800"
                           />
                         </div>
                       </td>
 
-                      {/* 1. Date */}
+                      {/* 1. Delivery No. */}
                       <td className="py-3.5 px-3.5 font-mono text-xs">
-                        <div className="font-bold text-slate-800">{plan.planDate}</div>
-                        <div className="text-[10px] text-slate-400 font-normal">{plan.id}</div>
+                        <div className="font-bold text-slate-900">{plan.deliveryNo || plan.id}</div>
+                        <div className="text-[10px] text-slate-400 font-normal">{plan.planDate}</div>
                       </td>
 
-                      {/* 2. Company Badge */}
-                      <td className="py-3.5 px-3.5">
-                        {isBoth ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-extrabold bg-gradient-to-r from-purple-100 via-indigo-100 to-pink-100 text-purple-900 border border-purple-300 shadow-2xs">
-                            <span className="w-2 h-2 rounded-full bg-purple-600 animate-pulse shrink-0"></span>
-                            Both (AHPL & AIL)
+                      {/* 2. Code */}
+                      <td className="py-3.5 px-3.5 font-mono text-xs">
+                        {plan.code ? (
+                          <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{plan.code}</span>
+                        ) : isBoth ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                            AHPL+AIL
                           </span>
                         ) : plan.company === 'AIL' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                             AIL
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600 shrink-0"></span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
                             AHPL
                           </span>
                         )}
                       </td>
 
-                      {/* 3. Destination Location */}
+                      {/* 3. Destination */}
                       <td className="py-3.5 px-3.5 font-medium text-slate-900">
                         <div className="flex items-center gap-1.5">
-                          <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+                          <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                           <span className="font-bold text-slate-800">{plan.destination}</span>
                         </div>
                       </td>
 
-                      {/* 4. Transporter */}
+                      {/* 4. Weight (Kg) */}
+                      <td className="py-3.5 px-3.5 font-mono font-bold text-slate-800">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                          <Scale className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{plan.totalWeight} Kg</span>
+                        </span>
+                      </td>
+
+                      {/* 5. CFT */}
+                      <td className="py-3.5 px-3.5 font-mono text-slate-700">
+                        {plan.totalCft ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200 font-semibold">
+                            <Box className="w-3.5 h-3.5 text-purple-600" />
+                            <span>{plan.totalCft}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs">-</span>
+                        )}
+                      </td>
+
+                      {/* 6. Vehicle Type */}
+                      <td className="py-3.5 px-3.5">
+                        <div className="space-y-1">
+                          <div>{renderVehicleBadge(plan.dispatchMode)}</div>
+                          {plan.assignedDock && (
+                            <div className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                              <Building2 className="w-3 h-3 text-indigo-600 shrink-0" />
+                              <span>{plan.assignedDock}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 7. Transporter Name */}
                       <td className="py-3.5 px-3.5 font-medium text-slate-700">
                         {plan.transporterName ? (
                           <span className="font-semibold text-slate-800">{plan.transporterName}</span>
@@ -1174,46 +1174,13 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                         )}
                       </td>
 
-                      {/* 5. Vehicle Type & Assigned Dock */}
-                      <td className="py-3.5 px-3.5">
-                        <div className="space-y-1">
-                          <div>{renderVehicleBadge(plan.dispatchMode)}</div>
-                          {plan.assignedDock && (
-                            <div className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                              <Building2 className="w-3 h-3 text-indigo-600 shrink-0" />
-                              <span>{plan.assignedDock}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* 6. Weight (KG) */}
-                      <td className="py-3.5 px-3.5 font-mono font-bold text-slate-800">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
-                          <Scale className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{plan.totalWeight} KG</span>
-                        </span>
-                      </td>
-
-                      {/* 7. CFT */}
-                      <td className="py-3.5 px-3.5 font-mono text-slate-700">
-                        {plan.totalCft ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-50 text-purple-800 border border-purple-200 font-semibold">
-                            <Box className="w-3.5 h-3.5 text-purple-600" />
-                            <span>{plan.totalCft} CFT</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 text-xs">-</span>
-                        )}
-                      </td>
-
-                      {/* 8. Actions */}
+                      {/* 8. Action */}
                       <td className="py-3.5 px-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(plan)}
-                            className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                             title={lang === 'hi' ? 'प्लान संपादित करें' : 'Edit Plan'}
                           >
                             <Edit2 className="w-4 h-4" />
@@ -1230,6 +1197,16 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
+                          {onPlaceVehicleToDock && (
+                            <button
+                              type="button"
+                              onClick={() => onPlaceVehicleToDock(plan)}
+                              className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition cursor-pointer"
+                              title={lang === 'hi' ? 'डॉक पर वाहन प्लेस करें' : 'Place Vehicle at Dock'}
+                            >
+                              <Truck className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1275,6 +1252,35 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
 
             {/* Streamlined Modal Form */}
             <form onSubmit={handleSubmitPlan} className="space-y-4 pt-4">
+              {/* Row 0: Delivery No & Code */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Delivery No. <span className="text-slate-400 font-normal">(Optional / Auto)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. DEL-89301"
+                    value={formDeliveryNo}
+                    onChange={(e) => setFormDeliveryNo(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-mono font-medium focus:ring-2 focus:ring-slate-500 focus:outline-none shadow-2xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Code <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. AHPL-01 / AIL-02"
+                    value={formCode}
+                    onChange={(e) => setFormCode(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white font-mono font-medium focus:ring-2 focus:ring-slate-500 focus:outline-none shadow-2xs"
+                  />
+                </div>
+              </div>
+
               {/* Row 1: Plan Date [Required] & Company Name [Required] */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

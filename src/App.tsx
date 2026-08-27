@@ -212,17 +212,13 @@ export default function App() {
   const [editingRecord, setEditingRecord] = useState<MovementRecord | null>(null);
   const [editingDockRecord, setEditingDockRecord] = useState<DockRecord | null>(null);
 
-  // ONE-TIME BROWSER CACHE PURGE ON MOUNT: Wipe out any old 154 cached entries
+  // ONE-TIME PURGE of legacy mock data caches while preserving Auth & Google Sheet Settings
   useEffect(() => {
     try {
-      const savedScriptUrl = localStorage.getItem('ahpl_apps_script_url');
-      localStorage.clear();
-      sessionStorage.clear();
-      if (savedScriptUrl) {
-        localStorage.setItem('ahpl_apps_script_url', savedScriptUrl);
-      }
+      localStorage.removeItem('dock_records_cache');
+      localStorage.removeItem('movement_records_cache');
     } catch (e) {
-      console.warn('Storage purge error:', e);
+      console.warn('Storage cleanup error:', e);
     }
   }, []);
 
@@ -751,7 +747,7 @@ export default function App() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#2D241E] flex font-sans selection:bg-stone-700 selection:text-white">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-800 flex font-sans selection:bg-slate-300 selection:text-slate-900">
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -771,37 +767,37 @@ export default function App() {
       {/* Main Workspace Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white border-b border-[#E2DCCE] sticky top-0 z-30 px-4 sm:px-6 py-3.5 shadow-2xs">
+        <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-8 py-3.5 shadow-xs">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="md:hidden p-2 rounded-xl bg-[#FBF9F5] border border-[#E2DCCE] text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="md:hidden p-2 rounded-xl bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 cursor-pointer"
                 title="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
               </button>
               <div>
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-[#1E293B] flex items-center gap-2">
-                  <span>AHPL & AIL Operations Hub</span>
+                <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-2">
+                  <span>Plan Received AHPL & AIL Tracker</span>
                 </h1>
-                <p className="text-xs text-slate-500 font-medium">
-                  Indore Hub • {todayFormatted}
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Indore Hub • Live Multi-Device Sync Active
                 </p>
               </div>
             </div>
 
             {/* Right Header Status and Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs">
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Systems Active</span>
+                <span>Auto-Sync Active</span>
               </div>
 
               {liveTime && (
-                <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono font-bold bg-[#FBF9F5] px-3 py-1.5 rounded-xl border border-[#E2DCCE] text-slate-700">
-                  <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                <div id="liveClock" className="hidden lg:flex items-center gap-1.5 text-xs font-mono font-medium text-slate-600 bg-slate-100 px-3 py-1 rounded-xl border border-slate-300">
+                  <Clock className="w-3.5 h-3.5 text-slate-500 animate-pulse" />
                   <span>{liveTime}</span>
                 </div>
               )}
@@ -809,7 +805,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleToggleLang}
-                className="px-2.5 py-1.5 text-xs font-bold bg-[#FBF9F5] hover:bg-white text-slate-700 border border-[#E2DCCE] rounded-xl transition cursor-pointer"
+                className="px-2.5 py-1 text-xs font-bold bg-slate-100 hover:bg-white text-slate-700 border border-slate-300 rounded-xl transition cursor-pointer"
                 title="Toggle Hindi / English"
               >
                 {lang === 'hi' ? 'EN' : 'हिन्दी'}
@@ -818,10 +814,10 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsStockModalOpen(true)}
-                className="px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                className="px-3 py-1 text-xs font-bold bg-slate-100 hover:bg-white text-slate-700 border border-slate-300 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 title="Stock Overview"
               >
-                <Boxes className="w-3.5 h-3.5 text-amber-700" />
+                <Boxes className="w-3.5 h-3.5 text-slate-600" />
                 <span className="hidden md:inline">Stock</span>
               </button>
 
@@ -829,7 +825,7 @@ export default function App() {
                 type="button"
                 onClick={() => handleFetchFromGoogleSheet(false)}
                 disabled={isFetchingSheet}
-                className="px-3 py-1.5 text-xs font-bold bg-[#1E293B] hover:bg-[#334155] text-white rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+                className="px-3 py-1 text-xs font-bold bg-slate-800 hover:bg-slate-900 text-white rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
                 title="Sync with Google Sheets"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSheet ? 'animate-spin' : ''}`} />

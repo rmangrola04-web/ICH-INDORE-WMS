@@ -2,7 +2,7 @@ import React from 'react';
 import {
   CheckSquare,
   LayoutDashboard,
-  Camera,
+  ClipboardList,
   Truck,
   Grid,
   Shield,
@@ -56,19 +56,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }> = [
     {
       id: 'executive',
-      label: lang === 'hi' ? 'डैशबोर्ड' : 'Dashboard',
+      label: lang === 'hi' ? 'डैशबोर्ड अवलोकन' : 'Dashboard Overview',
       icon: <LayoutDashboard className="w-4 h-4" />,
       roles: ['ADMIN', 'SUPERVISOR', 'SECURITY', 'OPERATOR'],
     },
     {
       id: 'plan',
-      label: lang === 'hi' ? 'दैनिक योजना (फोटो स्कैन)' : 'Daily Plan (Photo Scan)',
-      icon: <Camera className="w-4 h-4" />,
+      label: lang === 'hi' ? 'प्लान रिसीव्ड (AHPL & AIL)' : 'Plan Received (AHPL & AIL)',
+      icon: <ClipboardList className="w-4 h-4" />,
       roles: ['ADMIN', 'SUPERVISOR'],
     },
     {
       id: 'loading',
-      label: lang === 'hi' ? 'डॉक ऑपरेशन्स' : 'Dock Operations',
+      label: lang === 'hi' ? 'डॉक एंट्री फॉर्म' : 'Dock Entry Form',
       icon: <Truck className="w-4 h-4" />,
       roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'],
     },
@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Google Sheets Connection Settings"
           >
             <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{lang === 'hi' ? 'गूगल शीट सिंक' : 'Google Sheet Sync'}</span>
+            <span>{lang === 'hi' ? 'लाइव 2-वे सिंक' : 'Live 2-Way Sync'}</span>
           </button>
 
           <button

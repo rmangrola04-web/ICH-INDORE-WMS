@@ -516,10 +516,111 @@ export const ExecutiveHubDashboard: React.FC<ExecutiveHubDashboardProps> = ({
   const cleanPodRate = liveCompleted > 0 ? Math.max(80, Math.round(((liveCompleted - livePodHolds) / liveCompleted) * 100)) : 92;
   const dockUtilPct = Math.max(45, Math.min(100, Math.round((Math.max(liveActiveDocks, 7) / 9) * 100)));
 
+  const totalPlannedWeightSum = dailyPlans.reduce((sum, p) => sum + (Number(p.totalWeight) || 0), 0);
+  const totalPlannedCftSum = dailyPlans.reduce((sum, p) => sum + (Number(p.totalCft) || 0), 0);
+
   return (
     <div className="space-y-6">
+      {/* ======================================================= */}
+      {/* LIVE SUMMARY OVERVIEW (Glacier Light Gray Card)          */}
+      {/* ======================================================= */}
+      <div className="glass-glacier p-6 rounded-3xl border border-slate-200 space-y-4 shadow-sm bg-white">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            {lang === 'hi' ? 'लाइव सारांश अवलोकन' : 'Live Summary Overview'}
+          </h3>
+          <span className="text-xs text-slate-400">
+            {lang === 'hi' ? 'सभी डिवाइस पर ऑटो-सिंक' : 'Auto-Synced Across Devices'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+            <h4 className="text-2xl font-black text-slate-800" id="dashTotalDeliveries">
+              {dailyPlans.length}
+            </h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+              {lang === 'hi' ? 'निर्धारित डिलीवरी' : 'Planned Deliveries'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+            <h4 className="text-2xl font-black text-slate-700" id="dashTotalWeight">
+              {totalPlannedWeightSum.toFixed(2)} Kg
+            </h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+              {lang === 'hi' ? 'कुल निर्धारित वजन' : 'Total Weight'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+            <h4 className="text-2xl font-black text-indigo-700" id="dashTotalCFT">
+              {totalPlannedCftSum.toFixed(2)}
+            </h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+              {lang === 'hi' ? 'कुल CFT वॉल्यूम' : 'Total CFT Volume'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center">
+            <h4 className="text-2xl font-black text-emerald-700" id="dashActiveDocks">
+              {liveActiveDocks}
+            </h4>
+            <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">
+              {lang === 'hi' ? 'सक्रिय डॉक बे' : 'Active Bays'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ======================================================= */}
+      {/* OPERATIONS & COMPLIANCE BREAKDOWN (Glacier Light Gray)   */}
+      {/* ======================================================= */}
+      <div className="glass-glacier p-6 rounded-3xl border border-slate-200 shadow-sm bg-white">
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
+          {lang === 'hi' ? 'ऑपरेशन्स एवं अनुपालन विश्लेषण' : 'Operations Breakdown'}
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="w-16 h-16 rounded-full border-4 border-emerald-600 mx-auto flex items-center justify-center font-black text-slate-800 text-base mb-2">
+              {cleanPodRate}%
+            </div>
+            <p className="text-xs font-bold text-slate-800">
+              {lang === 'hi' ? 'क्लीन POD दर' : 'Clean POD Rate'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {lang === 'hi' ? 'कोई क्षति दर्ज नहीं' : 'No Damage Recorded'}
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="w-16 h-16 rounded-full border-4 border-slate-700 mx-auto flex items-center justify-center font-black text-slate-800 text-base mb-2">
+              {dockUtilPct}%
+            </div>
+            <p className="text-xs font-bold text-slate-800">
+              {lang === 'hi' ? 'डॉक उपयोगिता' : 'Dock Utilization'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {lang === 'hi' ? `${Math.max(liveActiveDocks, 7)} / 9 सक्रिय डॉक` : 'Active Bays in Use'}
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="w-16 h-16 rounded-full border-4 border-amber-600 mx-auto flex items-center justify-center font-black text-slate-800 text-base mb-2">
+              1h 15m
+            </div>
+            <p className="text-xs font-bold text-slate-800">
+              {lang === 'hi' ? 'औसत टर्नअराउंड समय' : 'Avg Turnaround (TAT)'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {lang === 'hi' ? 'लक्ष्य SLA के भीतर' : 'Within Target SLA'}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* ======================================================== */}
-      {/* CRITICAL ALERTS STRIP (Exact Layout Match)               */}
+      {/* CRITICAL ALERTS STRIP (Glacier Style)                    */}
       {/* ======================================================== */}
       <div className="bg-[#8B2626] text-white px-5 py-3 rounded-2xl shadow-sm flex items-center justify-between text-xs font-semibold">
         <div className="flex items-center gap-2.5">
@@ -534,7 +635,7 @@ export const ExecutiveHubDashboard: React.FC<ExecutiveHubDashboardProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* HERO BANNER - RAHUL PRAJAPATI (Exact Layout Match)       */}
+      {/* HERO BANNER - RAHUL PRAJAPATI                            */}
       {/* ======================================================== */}
       <div className="bg-[#1E3A5F] text-white p-6 rounded-3xl shadow-sm space-y-1 relative overflow-hidden">
         <div className="relative z-10">

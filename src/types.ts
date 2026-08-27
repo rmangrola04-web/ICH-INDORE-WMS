@@ -61,6 +61,8 @@ export type DispatchMode =
 export interface DailyPlanRecord {
   id: string;
   planDate: string; // YYYY-MM-DD or DD/MM/YYYY
+  deliveryNo?: string; // Delivery No. / Invoice No.
+  code?: string; // Destination or Unit Code (e.g. AHPL-01, DEL-01)
   company: 'AHPL' | 'AIL' | 'Both (AHPL & AIL)' | string;
   destination: string; // Place of Plan Location / Destination (Dropdown)
   transporterName?: string; // Assigned Transport / Transporter Name (Optional)

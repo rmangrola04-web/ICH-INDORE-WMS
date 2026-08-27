@@ -1,6 +1,6 @@
 {
   "name": "AHPL & AIL Warehouse & Transport Hub",
-  "description": "INTEGRATED CENTRAL HUB - INDORE: Executive Hub Dashboard, 14-column Dock Operations, Daily Plan Execution with combined shipments (AHPL, AIL, Both), Version History & Changelog timeline, and live Google Sheets CRUD sync.",
+  "description": "AHPL & AIL - Plan Received & Dispatch Hub: Indore Hub multi-device sync, Plan Received (Delivery No, Code, Destination, Weight, CFT, Vehicle Type & Transporter), Dock Operations, Live Docks (1-9), Gate Security, and Reports & Export.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
