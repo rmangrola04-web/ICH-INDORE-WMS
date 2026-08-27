@@ -3,6 +3,16 @@ export type CompanyPlan = 'AHPL' | 'AIL' | 'Both (AHPL & AIL)';
 export type MovementType = 'Inbound' | 'Outbound';
 export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
+export type UserRole = 'ADMIN' | 'SUPERVISOR' | 'SECURITY' | 'OPERATOR';
+
+export interface UserAccount {
+  username: string;
+  password?: string;
+  fullName: string;
+  role: UserRole;
+  avatarInitials: string;
+}
+
 export type AppTab =
   | 'executive'
   | 'tasks'

@@ -1,1 +1,45 @@
 @import "tailwindcss";
+
+/* Glacier Light Gray Theme */
+:root {
+  --bg-glacier: #F1F5F9;
+  --panel-glacier: rgba(255, 255, 255, 0.92);
+  --border-glacier: #E2E8F0;
+}
+
+body {
+  background-color: #F1F5F9;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(226, 232, 240, 0.75) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(203, 213, 225, 0.55) 0px, transparent 50%);
+  color: #1E293B;
+  min-height: 100vh;
+}
+
+.glass-glacier {
+  background: var(--panel-glacier);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-glacier);
+  box-shadow: 0 4px 20px -2px rgba(100, 116, 139, 0.06);
+}
+
+.input-glacier {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #1E293B;
+}
+
+.input-glacier:focus {
+  border-color: #64748B;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.15);
+  outline: none;
+}
+
+.active-nav {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  font-weight: 700 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border: 1px solid #CBD5E1 !important;
+}

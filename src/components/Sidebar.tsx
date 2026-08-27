@@ -2,7 +2,7 @@ import React from 'react';
 import {
   CheckSquare,
   LayoutDashboard,
-  ClipboardList,
+  Camera,
   Truck,
   Grid,
   Shield,
@@ -10,19 +10,22 @@ import {
   BarChart3,
   RefreshCw,
   Cloud,
-  HelpCircle,
+  BookOpen,
+  LogOut,
   X,
 } from 'lucide-react';
-import { AppTab, Language } from '../types';
+import { AppTab, Language, UserAccount } from '../types';
 
 interface SidebarProps {
   activeTab: AppTab;
   onTabChange: (tab: AppTab) => void;
   lang: Language;
+  currentUser?: UserAccount;
   taskCount?: number;
   onRefreshData: () => void;
   onOpenSyncSettings: () => void;
-  onOpenSystemGuide: () => void;
+  onOpenUserManual: () => void;
+  onLogout: () => void;
   isSyncing?: boolean;
   isOpenMobile?: boolean;
   onCloseMobile?: () => void;
@@ -32,61 +35,79 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
   lang,
+  currentUser,
   taskCount = 3,
   onRefreshData,
   onOpenSyncSettings,
-  onOpenSystemGuide,
+  onOpenUserManual,
+  onLogout,
   isSyncing = false,
   isOpenMobile = false,
   onCloseMobile,
 }) => {
-  const navItems: Array<{
+  const role = currentUser?.role || 'SUPERVISOR';
+
+  // Navigation Items matching role capabilities
+  const allNavItems: Array<{
     id: AppTab;
     label: string;
     icon: React.ReactNode;
-    badge?: string | number;
+    roles: string[];
   }> = [
     {
       id: 'executive',
       label: lang === 'hi' ? 'डैशबोर्ड' : 'Dashboard',
       icon: <LayoutDashboard className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR', 'SECURITY', 'OPERATOR'],
     },
     {
       id: 'plan',
-      label: lang === 'hi' ? 'डिस्पैच प्लान (फोटो स्कैन)' : 'Dispatch Plan (Photo Scan)',
-      icon: <ClipboardList className="w-4 h-4" />,
+      label: lang === 'hi' ? 'दैनिक योजना (फोटो स्कैन)' : 'Daily Plan (Photo Scan)',
+      icon: <Camera className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR'],
     },
     {
       id: 'loading',
       label: lang === 'hi' ? 'डॉक ऑपरेशन्स' : 'Dock Operations',
       icon: <Truck className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'],
     },
     {
       id: 'live',
       label: lang === 'hi' ? 'लाइव डॉक्स (1–9)' : 'Live Docks (1–9)',
       icon: <Grid className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'],
     },
     {
       id: 'tracker',
       label: lang === 'hi' ? 'गेट सिक्योरिटी लॉग' : 'Gate Security Log',
       icon: <Shield className="w-4 h-4" />,
+      roles: ['ADMIN', 'SECURITY', 'SUPERVISOR'],
     },
     {
       id: 'reports',
-      label: lang === 'hi' ? 'रिपोर्ट्स एवं सिंक' : 'Reports & Sync',
+      label: lang === 'hi' ? 'रिपोर्ट्स एवं एक्सपोर्ट' : 'Reports & Export',
       icon: <FileSpreadsheet className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR'],
     },
     {
       id: 'analytics',
-      label: lang === 'hi' ? 'एनालिटिक्स एवं अंतर्दृष्टि' : 'Analytics & Insights',
+      label: lang === 'hi' ? 'एनालिटिक्स एवं चार्ट्स' : 'Analytics & Charts',
       icon: <BarChart3 className="w-4 h-4" />,
+      roles: ['ADMIN', 'SUPERVISOR'],
     },
   ];
+
+  const filteredNavItems = allNavItems.filter((item) => item.roles.includes(role));
 
   const handleSelect = (tab: AppTab) => {
     onTabChange(tab);
     if (onCloseMobile) onCloseMobile();
   };
+
+  const displayName = currentUser?.fullName || 'Rahul Prajapati';
+  const displayRole = currentUser?.role || 'SUPERVISOR';
+  const displayInitials = currentUser?.avatarInitials || 'RP';
 
   return (
     <>
@@ -100,7 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Sidebar Aside */}
       <aside
-        className={`fixed lg:sticky top-0 z-50 lg:z-30 w-64 bg-[#ECE7DC] border-r border-[#DCD5C5] flex flex-col justify-between p-4 h-screen shrink-0 transition-transform duration-200 ease-in-out ${
+        className={`fixed lg:sticky top-0 z-50 lg:z-30 w-64 bg-[#E2E8F0] border-r border-slate-300 flex flex-col justify-between p-4 h-screen shrink-0 transition-transform duration-200 ease-in-out ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -111,39 +132,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={onCloseMobile}
-              className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-300/60"
+              className="p-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-300/60 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Top User Card (Exact Match) */}
-          <div className="bg-[#F7F4EC] p-3.5 rounded-2xl border border-[#DCD5C5] shadow-xs flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#2C3E50] text-amber-100 flex items-center justify-center font-bold text-sm shadow-inner shrink-0">
-              RP
+          {/* Top User Profile Card (Glacier Match) */}
+          <div className="bg-white p-3.5 rounded-2xl border border-slate-300 shadow-xs flex items-center gap-3">
+            <div
+              id="userAvatar"
+              className="w-10 h-10 rounded-xl bg-slate-800 text-slate-100 flex items-center justify-center font-bold text-sm shadow-inner shrink-0"
+            >
+              {displayInitials}
             </div>
             <div className="overflow-hidden">
-              <h2 className="text-xs font-bold text-slate-900 truncate">Rahul Prajapati</h2>
-              <p className="text-[10px] text-slate-500 font-medium truncate">Warehouse Staff / Lead</p>
+              <h2 id="userBadgeName" className="text-xs font-bold text-slate-900 truncate">
+                {displayName}
+              </h2>
+              <p id="userBadgeRole" className="text-[10px] text-slate-500 font-semibold uppercase truncate">
+                {displayRole}
+              </p>
             </div>
           </div>
 
-          {/* Top Primary Menu: My Tasks */}
+          {/* My Tasks button */}
           <button
             type="button"
             onClick={() => handleSelect('tasks')}
             className={`sidebar-item w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
               activeTab === 'tasks'
-                ? 'bg-white text-slate-900 font-bold shadow-xs border border-amber-200'
-                : 'text-slate-700 hover:bg-white/60'
+                ? 'active-nav'
+                : 'text-slate-700 hover:bg-white/70'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <CheckSquare className="w-4 h-4 text-amber-800" />
-              <span>{lang === 'hi' ? 'मेरे कार्य (टास्क)' : 'My Tasks'}</span>
+              <CheckSquare className="w-4 h-4 text-slate-700" />
+              <span>{lang === 'hi' ? 'मेरे कार्य' : 'My Tasks'}</span>
             </div>
             {taskCount > 0 && (
-              <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full text-[10px] font-bold">
+              <span className="bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full text-[10px] font-bold">
                 {taskCount}
               </span>
             )}
@@ -151,12 +179,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Modules Group */}
           <div className="pt-2">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-2">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">
               {lang === 'hi' ? 'मॉड्यूल सूची' : 'Modules'}
             </p>
 
             <div className="space-y-1">
-              {navItems.map((item) => {
+              {filteredNavItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
                   <button
@@ -165,11 +193,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => handleSelect(item.id)}
                     className={`sidebar-item w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer text-left ${
                       isActive
-                        ? 'bg-white text-[#1E293B] font-bold shadow-xs border border-[#DCD5C5]'
-                        : 'text-slate-700 hover:bg-white/60'
+                        ? 'active-nav'
+                        : 'text-slate-700 hover:bg-white/70'
                     }`}
                   >
-                    <span className={isActive ? 'text-slate-900' : 'text-slate-600'}>{item.icon}</span>
+                    <span className="text-slate-700">{item.icon}</span>
                     <span className="truncate">{item.label}</span>
                   </button>
                 );
@@ -178,40 +206,51 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Bottom Actions (Exact Match) */}
-        <div className="space-y-1.5 pt-3 border-t border-[#DCD5C5] shrink-0">
+        {/* Bottom Actions */}
+        <div className="space-y-1.5 pt-4 border-t border-slate-300 shrink-0">
           <button
             type="button"
             onClick={onRefreshData}
             disabled={isSyncing}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white/70 hover:bg-white border border-[#DCD5C5] transition shadow-2xs cursor-pointer disabled:opacity-60"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition shadow-xs cursor-pointer disabled:opacity-60"
             title="Refresh Live Data from Google Sheets"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? (lang === 'hi' ? 'सिंक हो रहा है...' : 'Refreshing...') : (lang === 'hi' ? 'डेटा रीफ्रेश करें' : 'Refresh Data')}</span>
+            <span>{isSyncing ? (lang === 'hi' ? 'सिंक हो रहा है...' : 'Refreshing...') : (lang === 'hi' ? 'डेटा रीफ्रेश' : 'Refresh Data')}</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenSyncSettings}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-white/60 transition cursor-pointer"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 transition shadow-xs cursor-pointer"
             title="Google Sheets Connection Settings"
           >
-            <Cloud className="w-3.5 h-3.5 text-emerald-700" />
+            <Cloud className="w-3.5 h-3.5 text-emerald-600" />
             <span>{lang === 'hi' ? 'गूगल शीट सिंक' : 'Google Sheet Sync'}</span>
           </button>
 
           <button
             type="button"
-            onClick={onOpenSystemGuide}
-            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-800 transition cursor-pointer"
-            title="Open System Changelog and Operations Guide"
+            onClick={onOpenUserManual}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-white/60 transition cursor-pointer"
+            title="Open User Manual and Operations Guide"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-slate-500" />
-            <span>{lang === 'hi' ? 'सिस्टम गाइड' : 'System Guide'}</span>
+            <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+            <span>{lang === 'hi' ? 'उपयोगकर्ता गाइड' : 'User Manual & Guide'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="w-full flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+            title="Logout of current user session"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <span>{lang === 'hi' ? 'लॉगआउट' : 'Logout'}</span>
           </button>
         </div>
       </aside>
     </>
   );
 };
+

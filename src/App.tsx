@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy, History, Sparkles, Menu, Clock, Boxes } from 'lucide-react';
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy, History, Sparkles, Menu, Clock, Boxes, ShieldCheck, User } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { MyTasksView } from './components/MyTasksView';
 import { ExecutiveHubDashboard } from './components/ExecutiveHubDashboard';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { UserManualModal } from './components/UserManualModal';
+import { AuthModal } from './components/AuthModal';
 import { GatePassModal } from './components/GatePassModal';
 import { StockOverviewModal } from './components/StockOverviewModal';
 import { EditRecordModal } from './components/EditRecordModal';
@@ -27,6 +29,8 @@ import {
   CompanyUnit,
   DailyPlanRecord,
   PlanExecutionStatus,
+  UserAccount,
+  UserRole,
 } from './types';
 import { t } from './utils/translations';
 import {
@@ -50,7 +54,67 @@ import {
 
 export { GOOGLE_SCRIPT_URL };
 
+const DEFAULT_ACCOUNTS: UserAccount[] = [
+  {
+    username: 'admin',
+    password: 'admin123',
+    fullName: 'Operations Admin',
+    role: 'ADMIN',
+    avatarInitials: 'AD',
+  },
+  {
+    username: 'supervisor',
+    password: 'super123',
+    fullName: 'Rahul Prajapati',
+    role: 'SUPERVISOR',
+    avatarInitials: 'RP',
+  },
+  {
+    username: 'security',
+    password: 'gate123',
+    fullName: 'R.K. Sharma',
+    role: 'SECURITY',
+    avatarInitials: 'RS',
+  },
+  {
+    username: 'operator',
+    password: 'op123',
+    fullName: 'Deepak Patel',
+    role: 'OPERATOR',
+    avatarInitials: 'DP',
+  },
+];
+
 export default function App() {
+  // Authentication State
+  const [registeredUsers, setRegisteredUsers] = useState<UserAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem('ahpl_registered_users');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_ACCOUNTS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('ahpl_current_user');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // fallback
+    }
+    return DEFAULT_ACCOUNTS[1]; // Default to Rahul Prajapati (Supervisor)
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isUserManualOpen, setIsUserManualOpen] = useState<boolean>(false);
+
   // Navigation State - Defaults to Flagship Executive Hub Dashboard
   const [activeTab, setActiveTab] = useState<AppTab>('executive');
 
@@ -92,6 +156,51 @@ export default function App() {
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Save current user to localStorage
+  useEffect(() => {
+    try {
+      if (currentUser) {
+        localStorage.setItem('ahpl_current_user', JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem('ahpl_current_user');
+      }
+    } catch (e) {
+      console.warn('User storage save error:', e);
+    }
+  }, [currentUser]);
+
+  // Save registered users to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('ahpl_registered_users', JSON.stringify(registeredUsers));
+    } catch (e) {
+      console.warn('Registered users save error:', e);
+    }
+  }, [registeredUsers]);
+
+  const handleRegisterUser = (newUser: UserAccount) => {
+    setRegisteredUsers((prev) => [...prev, newUser]);
+  };
+
+  const handleLoginSuccess = (user: UserAccount) => {
+    setCurrentUser(user);
+    setIsAuthModalOpen(false);
+
+    // Contextually route to the optimal view for their role
+    if (user.role === 'SECURITY') {
+      setActiveTab('tracker');
+    } else if (user.role === 'OPERATOR') {
+      setActiveTab('live');
+    } else {
+      setActiveTab('executive');
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setIsAuthModalOpen(true);
+  };
 
   // Filters for Movement Table
   const [activeUnitFilter, setActiveUnitFilter] = useState<string>('All');
@@ -648,10 +757,12 @@ export default function App() {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         lang={lang}
+        currentUser={currentUser || undefined}
         taskCount={3}
         onRefreshData={() => handleFetchFromGoogleSheet(false)}
         onOpenSyncSettings={() => setIsSettingsOpen(true)}
-        onOpenSystemGuide={() => setIsVersionModalOpen(true)}
+        onOpenUserManual={() => setIsUserManualOpen(true)}
+        onLogout={handleLogout}
         isSyncing={isFetchingSheet}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
@@ -1055,6 +1166,21 @@ export default function App() {
         isOpen={isVersionModalOpen}
         onClose={() => setIsVersionModalOpen(false)}
         lang={lang}
+      />
+
+      {/* User Manual & Guide Modal */}
+      <UserManualModal
+        isOpen={isUserManualOpen}
+        onClose={() => setIsUserManualOpen(false)}
+        lang={lang}
+      />
+
+      {/* Authentication Login & Registration Screen */}
+      <AuthModal
+        isOpen={isAuthModalOpen || currentUser === null}
+        onLoginSuccess={handleLoginSuccess}
+        registeredUsers={registeredUsers}
+        onRegisterUser={handleRegisterUser}
       />
     </div>
   );
