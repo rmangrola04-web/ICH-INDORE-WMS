@@ -162,6 +162,41 @@ export async function addLiveDailyPlan(plan: DailyPlanRecord, customUrl?: string
 }
 
 /**
+ * BATCH ADD Daily Plans from CSV upload to Google Sheets
+ */
+export async function batchAddLiveDailyPlans(
+  plans: DailyPlanRecord[],
+  customUrl?: string
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  const url = (customUrl || getActiveGoogleScriptUrl()).trim();
+  if (!url) {
+    return { success: false, error: 'Google Apps Script Web App URL is not configured.' };
+  }
+
+  if (!plans || plans.length === 0) {
+    return { success: true, count: 0 };
+  }
+
+  const payload = {
+    action: 'DAILY_PLAN_BATCH_ADD',
+    plans: plans,
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return { success: true, count: plans.length };
+  } catch (err: any) {
+    console.error('Batch Add Daily Plans to Google Sheet failed:', err);
+    return { success: false, error: err.message || 'Failed to send Batch Daily Plans to Google Sheet.' };
+  }
+}
+
+/**
  * UPDATE an existing Daily Plan in Google Sheets
  */
 export async function updateLiveDailyPlan(plan: DailyPlanRecord, customUrl?: string): Promise<{ success: boolean; error?: string }> {
@@ -624,6 +659,16 @@ function handleRequest(e, method) {
     if (action === "DAILY_PLAN_ADD") {
       var newPlan = insertDailyPlan(planSheet, payload.plan || payload);
       return createJsonResponse({ status: "success", message: "Daily Plan added successfully", id: newPlan.id, plan: newPlan });
+    }
+
+    if (action === "DAILY_PLAN_BATCH_ADD") {
+      var batchPlans = payload.plans || [];
+      var addedList = [];
+      for (var b = 0; b < batchPlans.length; b++) {
+        var added = insertDailyPlan(planSheet, batchPlans[b]);
+        addedList.push(added);
+      }
+      return createJsonResponse({ status: "success", count: addedList.length, message: addedList.length + " daily plans added successfully", data: addedList });
     }
 
     if (action === "DAILY_PLAN_UPDATE") {

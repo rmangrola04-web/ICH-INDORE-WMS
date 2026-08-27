@@ -8,11 +8,9 @@ import {
   ClipboardList,
   PackageCheck,
   LayoutDashboard,
-  History,
 } from 'lucide-react';
 import { AppTab, Language } from '../types';
 import { t } from '../utils/translations';
-import { CURRENT_APP_VERSION } from '../data/changelogData';
 
 interface NavigationTabsProps {
   activeTab: AppTab;
@@ -79,12 +77,6 @@ export const NavigationTabs: React.FC<NavigationTabsProps> = ({
       id: 'analytics',
       label: dict.tabAnalytics,
       icon: <BarChart3 className="w-4 h-4" />,
-    },
-    {
-      id: 'version',
-      label: lang === 'hi' ? 'वर्जन हिस्ट्री' : 'Version History',
-      icon: <History className="w-4 h-4" />,
-      badge: CURRENT_APP_VERSION,
     },
   ];
 

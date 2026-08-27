@@ -5,6 +5,7 @@ export type MovementStatus = 'Completed' | 'In-Progress' | 'Pending';
 
 export type AppTab =
   | 'executive'
+  | 'tasks'
   | 'plan'
   | 'loading'
   | 'live'

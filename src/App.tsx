@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy, History, Sparkles } from 'lucide-react';
-import { Navbar } from './components/Navbar';
-import { NavigationTabs } from './components/NavigationTabs';
+import { RefreshCw, CheckCircle2, AlertCircle, ExternalLink, Settings2, Trash2, Check, Copy, History, Sparkles, Menu, Clock, Boxes } from 'lucide-react';
+import { Sidebar } from './components/Sidebar';
+import { MyTasksView } from './components/MyTasksView';
 import { ExecutiveHubDashboard } from './components/ExecutiveHubDashboard';
-import { WhatsNewBanner } from './components/WhatsNewBanner';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { GatePassModal } from './components/GatePassModal';
 import { StockOverviewModal } from './components/StockOverviewModal';
@@ -41,6 +40,7 @@ import {
   bulkDeleteLiveSheetRecords,
   fetchLiveDailyPlans,
   addLiveDailyPlan,
+  batchAddLiveDailyPlans,
   updateLiveDailyPlan,
   deleteLiveDailyPlan,
   bulkDeleteLiveDailyPlans,
@@ -73,6 +73,25 @@ export default function App() {
 
   // Language state (defaults to 'hi')
   const [lang, setLang] = useState<Language>('hi');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [liveTime, setLiveTime] = useState<string>('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setLiveTime(
+        now.toLocaleTimeString('en-US', {
+          hour12: true,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Filters for Movement Table
   const [activeUnitFilter, setActiveUnitFilter] = useState<string>('All');
@@ -172,6 +191,27 @@ export default function App() {
       addLiveDailyPlan(fullPlan, activeUrl).catch((err) => {
         console.warn('Background Daily Plan sync error:', err);
       });
+    }
+  };
+
+  const handleBatchAddDailyPlans = async (newPlansData: Array<Omit<DailyPlanRecord, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    const now = new Date().toISOString();
+    const createdPlans: DailyPlanRecord[] = newPlansData.map((data, idx) => ({
+      ...data,
+      id: `PLAN-${Math.floor(1000 + Math.random() * 9000)}-${idx + 1}`,
+      createdAt: now,
+      updatedAt: now,
+    }));
+
+    setDailyPlans((prev) => [...createdPlans, ...prev]);
+
+    const activeUrl = getActiveGoogleScriptUrl();
+    if (activeUrl) {
+      try {
+        await batchAddLiveDailyPlans(createdPlans, activeUrl);
+      } catch (err) {
+        console.warn('Batch daily plan upload error:', err);
+      }
     }
   };
 
@@ -594,261 +634,243 @@ export default function App() {
     )
   ).filter(Boolean).length;
 
+  const todayFormatted = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Top Header */}
-      <Navbar
-        lang={lang}
-        onToggleLang={handleToggleLang}
-        onOpenStockModal={() => setIsStockModalOpen(true)}
-        onOpenVersionModal={() => setIsVersionModalOpen(true)}
-      />
-
-      {/* Dynamic Update Notification (What's New Banner) */}
-      <WhatsNewBanner onOpenChangelog={() => setIsVersionModalOpen(true)} lang={lang} />
-
-      {/* Live Google Sheets Sync Status Bar */}
-      <div className="bg-slate-900 border-b border-slate-800 text-white px-4 py-2 text-xs">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              100% Live Google Sheets Sync
-            </span>
-            {lastSyncTime && (
-              <span className="text-slate-400 hidden sm:inline">
-                Last synced: <span className="font-mono text-slate-300">{lastSyncTime}</span>
-              </span>
-            )}
-            {syncMessage && (
-              <span className={`text-[11px] hidden md:inline font-medium ${syncStatus === 'error' ? 'text-amber-400' : 'text-slate-300'}`}>
-                {syncMessage}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => handleFetchFromGoogleSheet(false)}
-              disabled={isFetchingSheet}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-semibold cursor-pointer disabled:opacity-50 transition shadow-xs"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSheet ? 'animate-spin' : ''}`} />
-              <span>{isFetchingSheet ? 'Syncing...' : 'Sync Live Sheet'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs border border-slate-700 cursor-pointer transition"
-              title="Google Apps Script Web App URL Settings"
-            >
-              <Settings2 className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hidden sm:inline">API Config</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Bar (Distinct Tabs) */}
-      <NavigationTabs
+    <div className="min-h-screen bg-[#F4F1EA] text-[#2D241E] flex font-sans selection:bg-stone-700 selection:text-white">
+      {/* Sidebar Navigation */}
+      <Sidebar
         activeTab={activeTab}
         onTabChange={setActiveTab}
         lang={lang}
-        dockCount={dockRecords.length}
-        activeBayCount={activeBayCount}
-        planCount={dailyPlans.length}
-        pendingPlanCount={dailyPlans.filter((p) => p.status === 'Pending' || p.status === 'Vehicle Placed').length}
-        onOpenStockModal={() => setIsStockModalOpen(true)}
+        taskCount={3}
+        onRefreshData={() => handleFetchFromGoogleSheet(false)}
+        onOpenSyncSettings={() => setIsSettingsOpen(true)}
+        onOpenSystemGuide={() => setIsVersionModalOpen(true)}
+        isSyncing={isFetchingSheet}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
-      {/* Main Content Areas */}
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6 flex-1 w-full">
-        {/* TAB 0: EXECUTIVE HUB DASHBOARD (CENTRAL OPERATIONS OVERVIEW) */}
-        {activeTab === 'executive' && (
-          <section id="executiveTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <ExecutiveHubDashboard
-              dockRecords={dockRecords}
-              dailyPlans={dailyPlans}
-              lang={lang}
-              onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
-              onResetSheetToEmpty={() => setIsResetConfirmOpen(true)}
-              isSyncing={isFetchingSheet}
-              lastSyncTime={lastSyncTime}
-            />
-          </section>
-        )}
-
-        {/* TAB: DAILY PLAN EXECUTION */}
-        {activeTab === 'plan' && (
-          <section id="planTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <DailyPlanExecutionView
-              plans={dailyPlans}
-              lang={lang}
-              onAddPlan={handleAddDailyPlan}
-              onUpdatePlan={handleUpdateDailyPlan}
-              onDeletePlan={handleDeleteDailyPlan}
-              onBulkDeletePlans={handleBulkDeleteDailyPlans}
-              onQuickStatusChange={handleQuickPlanStatusChange}
-              onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
-              isSyncing={isFetchingSheet}
-              lastSyncTime={lastSyncTime}
-            />
-          </section>
-        )}
-
-        {/* TAB 1: LOADING & UNLOADING */}
-        {activeTab === 'loading' && (
-          <section id="loadingTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            {/* Quick KPIs */}
-            <DockKPICards dockRecords={dockRecords} lang={lang} />
-
-            {/* Dock Entry Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {/* Form */}
-              <div className="lg:col-span-1">
-                <DockEntryForm lang={lang} onAddDockRecord={handleAddDockRecord} />
-              </div>
-
-              {/* Operations Table */}
-              <div className="lg:col-span-2">
-                <DockTurnaroundTable
-                  records={dockRecords}
-                  lang={lang}
-                  onUpdateStatus={handleUpdateDockStatus}
-                  onBulkUpdateStatus={handleBulkUpdateDockStatus}
-                  onDeleteRecord={handleDeleteDockRecord}
-                  onBulkDelete={handleBulkDeleteDock}
-                  onEditRecord={(rec) => setEditingDockRecord(rec)}
-                  onQuickComplete={handleQuickCompleteDock}
-                />
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* TAB 2: LIVE ACTIVITY */}
-        {activeTab === 'live' && (
-          <section id="liveTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <LiveActivityView
-              records={dockRecords}
-              lang={lang}
-              onQuickComplete={handleQuickCompleteDock}
-              onAssignGate={(_gate) => setActiveTab('loading')}
-              onEditRecord={(rec) => setEditingDockRecord(rec)}
-            />
-          </section>
-        )}
-
-        {/* TAB: VEHICLE MOVEMENT TRACKER (GUARD & SUPERVISOR) */}
-        {activeTab === 'tracker' && (
-          <section id="trackerTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <GuardSupervisorTracker
-              records={dockRecords}
-              lang={lang}
-              onAddGuardEntry={handleAddGuardEntry}
-              onStartActivity={handleStartSupervisorActivity}
-              onCloseActivity={handleCloseSupervisorActivity}
-              onSyncFromSheet={handleSyncFromSheet}
-            />
-          </section>
-        )}
-
-        {/* TAB 3: REPORTS */}
-        {activeTab === 'reports' && (
-          <section id="reportsTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <ReportsView
-              records={dockRecords}
-              lang={lang}
-              onEditRecord={(rec) => setEditingDockRecord(rec)}
-              onDeleteRecord={handleDeleteDockRecord}
-            />
-          </section>
-        )}
-
-        {/* TAB 4: ANALYTICS & GRAPHS */}
-        {activeTab === 'analytics' && (
-          <section id="analyticsTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <AnalyticsView records={dockRecords} lang={lang} />
-          </section>
-        )}
-
-        {/* TAB 5: VERSION HISTORY & CHANGELOG */}
-        {activeTab === 'version' && (
-          <section id="versionTab" className="tab-content space-y-6 animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                    <History className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900">
-                      {lang === 'hi' ? 'सिस्टम वर्जन एवं अपग्रेड हिस्ट्री' : 'System Version & Changelog'}
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      {lang === 'hi'
-                        ? 'इंटीग्रेटेड सेंट्रल हब - इंदौर के सभी रिलीज और नई सुविधाएं'
-                        : 'Integrated Central Hub Indore continuous release history'}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsVersionModalOpen(true)}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{lang === 'hi' ? 'डिटेल्ड मोडल खोलें' : 'Open Detailed View'}</span>
-                </button>
-              </div>
-
-              {/* Directly trigger the rich modal view or open */}
-              <div className="py-8 text-center space-y-3">
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                  {CURRENT_APP_VERSION} • Production Live Release
-                </span>
-                <p className="text-sm text-slate-600 max-w-md mx-auto">
-                  {lang === 'hi'
-                    ? 'सभी वर्जन, नई सुविधाएं (Features), लॉजिक सुधार (Improvements), और बग फिक्स (Bug Fixes) देखने के लिए नीचे दिए गए बटन पर क्लिक करें।'
-                    : 'Click below to explore the release timeline, feature notes, logic updates, and bug fixes.'}
+      {/* Main Workspace Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header */}
+        <header className="bg-white border-b border-[#E2DCCE] sticky top-0 z-30 px-4 sm:px-6 py-3.5 shadow-2xs">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="md:hidden p-2 rounded-xl bg-[#FBF9F5] border border-[#E2DCCE] text-slate-700 hover:bg-slate-100 cursor-pointer"
+                title="Open Navigation Menu"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <div>
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-[#1E293B] flex items-center gap-2">
+                  <span>AHPL & AIL Operations Hub</span>
+                </h1>
+                <p className="text-xs text-slate-500 font-medium">
+                  Indore Hub • {todayFormatted}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsVersionModalOpen(true)}
-                  className="mt-2 px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-sm transition cursor-pointer shadow-md"
-                >
-                  {lang === 'hi' ? 'फुल टाइमलाइन देखें' : 'View Full Release Timeline'}
-                </button>
               </div>
             </div>
-          </section>
-        )}
-      </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 px-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span>
-              © {new Date().getFullYear()} <strong>AHPL & AIL</strong> - Integrated Central Hub Indore. All rights reserved.
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsVersionModalOpen(true)}
-              className="inline-flex items-center gap-1 font-mono font-bold text-[11px] bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-300 transition cursor-pointer"
-              title="View Version History & Release Notes"
-            >
-              <History className="w-3 h-3 text-indigo-500" />
-              <span>{CURRENT_APP_VERSION} • Live</span>
-            </button>
+            {/* Right Header Status and Actions */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Systems Active</span>
+              </div>
+
+              {liveTime && (
+                <div className="hidden lg:flex items-center gap-1.5 text-xs font-mono font-bold bg-[#FBF9F5] px-3 py-1.5 rounded-xl border border-[#E2DCCE] text-slate-700">
+                  <Clock className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                  <span>{liveTime}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleToggleLang}
+                className="px-2.5 py-1.5 text-xs font-bold bg-[#FBF9F5] hover:bg-white text-slate-700 border border-[#E2DCCE] rounded-xl transition cursor-pointer"
+                title="Toggle Hindi / English"
+              >
+                {lang === 'hi' ? 'EN' : 'हिन्दी'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsStockModalOpen(true)}
+                className="px-3 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Stock Overview"
+              >
+                <Boxes className="w-3.5 h-3.5 text-amber-700" />
+                <span className="hidden md:inline">Stock</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleFetchFromGoogleSheet(false)}
+                disabled={isFetchingSheet}
+                className="px-3 py-1.5 text-xs font-bold bg-[#1E293B] hover:bg-[#334155] text-white rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+                title="Sync with Google Sheets"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSheet ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isFetchingSheet ? 'Syncing...' : 'Sync'}</span>
+              </button>
+            </div>
           </div>
-          <span className="font-mono text-slate-400">
-            100% Live Google Sheets Backend • Zero Mock Data
-          </span>
-        </div>
-      </footer>
+        </header>
+
+        {/* Main Content View Container */}
+        <main className="p-4 sm:p-6 lg:p-8 space-y-6 flex-1 max-w-7xl mx-auto w-full">
+          {/* TAB 0: EXECUTIVE HUB DASHBOARD */}
+          {activeTab === 'executive' && (
+            <section id="executiveTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <ExecutiveHubDashboard
+                dockRecords={dockRecords}
+                dailyPlans={dailyPlans}
+                lang={lang}
+                onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
+                onResetSheetToEmpty={() => setIsResetConfirmOpen(true)}
+                isSyncing={isFetchingSheet}
+                lastSyncTime={lastSyncTime}
+              />
+            </section>
+          )}
+
+          {/* TAB: MY TASKS */}
+          {activeTab === 'tasks' && (
+            <section id="tasksTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <MyTasksView lang={lang} />
+            </section>
+          )}
+
+          {/* TAB: DAILY PLAN EXECUTION (PHOTO SCAN) */}
+          {activeTab === 'plan' && (
+            <section id="planTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <DailyPlanExecutionView
+                plans={dailyPlans}
+                lang={lang}
+                onAddPlan={handleAddDailyPlan}
+                onBatchAddPlans={handleBatchAddDailyPlans}
+                onUpdatePlan={handleUpdateDailyPlan}
+                onDeletePlan={handleDeleteDailyPlan}
+                onBulkDeletePlans={handleBulkDeleteDailyPlans}
+                onQuickStatusChange={handleQuickPlanStatusChange}
+                onSyncGoogleSheets={() => handleFetchFromGoogleSheet(false)}
+                isSyncing={isFetchingSheet}
+                lastSyncTime={lastSyncTime}
+              />
+            </section>
+          )}
+
+          {/* TAB 1: LOADING & UNLOADING (DOCK OPERATIONS) */}
+          {activeTab === 'loading' && (
+            <section id="loadingTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              {/* Quick KPIs */}
+              <DockKPICards dockRecords={dockRecords} lang={lang} />
+
+              {/* Dock Entry Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                {/* Form */}
+                <div className="lg:col-span-1">
+                  <DockEntryForm lang={lang} onAddDockRecord={handleAddDockRecord} />
+                </div>
+
+                {/* Operations Table */}
+                <div className="lg:col-span-2">
+                  <DockTurnaroundTable
+                    records={dockRecords}
+                    lang={lang}
+                    onUpdateStatus={handleUpdateDockStatus}
+                    onBulkUpdateStatus={handleBulkUpdateDockStatus}
+                    onDeleteRecord={handleDeleteDockRecord}
+                    onBulkDelete={handleBulkDeleteDock}
+                    onEditRecord={(rec) => setEditingDockRecord(rec)}
+                    onQuickComplete={handleQuickCompleteDock}
+                  />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* TAB 2: LIVE ACTIVITY */}
+          {activeTab === 'live' && (
+            <section id="liveTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <LiveActivityView
+                records={dockRecords}
+                lang={lang}
+                onQuickComplete={handleQuickCompleteDock}
+                onAssignGate={(_gate) => setActiveTab('loading')}
+                onEditRecord={(rec) => setEditingDockRecord(rec)}
+              />
+            </section>
+          )}
+
+          {/* TAB: VEHICLE MOVEMENT TRACKER (GUARD & SUPERVISOR) */}
+          {activeTab === 'tracker' && (
+            <section id="trackerTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <GuardSupervisorTracker
+                records={dockRecords}
+                lang={lang}
+                onAddGuardEntry={handleAddGuardEntry}
+                onStartActivity={handleStartSupervisorActivity}
+                onCloseActivity={handleCloseSupervisorActivity}
+                onSyncFromSheet={handleSyncFromSheet}
+              />
+            </section>
+          )}
+
+          {/* TAB 3: REPORTS */}
+          {activeTab === 'reports' && (
+            <section id="reportsTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <ReportsView
+                records={dockRecords}
+                lang={lang}
+                onEditRecord={(rec) => setEditingDockRecord(rec)}
+                onDeleteRecord={handleDeleteDockRecord}
+              />
+            </section>
+          )}
+
+          {/* TAB 4: ANALYTICS & GRAPHS */}
+          {activeTab === 'analytics' && (
+            <section id="analyticsTab" className="tab-content space-y-6 animate-in fade-in duration-150">
+              <AnalyticsView records={dockRecords} lang={lang} />
+            </section>
+          )}
+        </main>
+
+        {/* Footer */}
+        <footer className="bg-white border-t border-[#E2DCCE] py-4 px-6 text-center text-xs text-slate-500">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span>
+                © {new Date().getFullYear()} <strong>AHPL & AIL</strong> - Integrated Central Hub Indore. All rights reserved.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsVersionModalOpen(true)}
+                className="inline-flex items-center gap-1 font-mono font-bold text-[11px] bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-300 transition cursor-pointer"
+                title="View Version History & Release Notes"
+              >
+                <History className="w-3 h-3 text-indigo-500" />
+                <span>{CURRENT_APP_VERSION} • Live</span>
+              </button>
+            </div>
+            <span className="font-mono text-slate-400">
+              100% Live Google Sheets Backend • Zero Mock Data
+            </span>
+          </div>
+        </footer>
+      </div>
 
       {/* Google Sheets Web App Config Modal */}
       {isSettingsOpen && (
