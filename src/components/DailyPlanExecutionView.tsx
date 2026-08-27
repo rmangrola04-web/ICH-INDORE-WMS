@@ -647,6 +647,51 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
     }, 0);
   }, [plans]);
 
+  // Location / Station & Vehicle Wise Summary Grouping
+  const summaryGroups = useMemo(() => {
+    const map = new Map<string, {
+      id: string;
+      location: string;
+      vehicleType: string;
+      transporters: Set<string>;
+      totalDeliveries: number;
+      totalWeight: number;
+      totalCft: number;
+      status: string;
+    }>();
+
+    filteredPlans.forEach((plan) => {
+      const loc = plan.destination || 'Indore Local / City Hub';
+      const veh = plan.dispatchMode || '32 Ft MXL';
+      const key = `${loc}___${veh}`;
+
+      const wt = parseFloat(String(plan.totalWeight || 0).replace(/[^0-9.]/g, '')) || 0;
+      const cft = parseFloat(String(plan.totalCft || 0).replace(/[^0-9.]/g, '')) || 0;
+      const transp = plan.transporterName || 'ICRL';
+
+      const existing = map.get(key);
+      if (existing) {
+        existing.totalDeliveries += 1;
+        existing.totalWeight += wt;
+        existing.totalCft += cft;
+        if (transp) existing.transporters.add(transp);
+      } else {
+        map.set(key, {
+          id: key,
+          location: loc,
+          vehicleType: veh,
+          transporters: new Set(transp ? [transp] : []),
+          totalDeliveries: 1,
+          totalWeight: wt,
+          totalCft: cft,
+          status: 'Ready for Dispatch',
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [filteredPlans]);
+
   // Export CSV
   const handleExportCSV = () => {
     if (filteredPlans.length === 0) {
@@ -916,8 +961,85 @@ export const DailyPlanExecutionView: React.FC<DailyPlanExecutionViewProps> = ({
         </div>
       </div>
 
-      {/* Main Interactive Table Section */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+      {/* 1. LOCATION & VEHICLE WISE SUMMARIZED TABLE */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex justify-between items-center pb-2 border-b border-slate-100">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Station & Vehicle Wise Plan Summary</span>
+          </h3>
+          <span id="summaryGroupCount" className="text-[11px] text-slate-600 font-bold bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+            {summaryGroups.length} Groups
+          </span>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-slate-100 text-slate-800 uppercase font-black border-b border-slate-300">
+              <tr>
+                <th className="py-2.5 px-3">Location / Station</th>
+                <th className="py-2.5 px-3">Vehicle Type</th>
+                <th className="py-2.5 px-3">Transporter</th>
+                <th className="py-2.5 px-3 text-center">Total Deliveries</th>
+                <th className="py-2.5 px-3 text-right">Total Weight (Kg)</th>
+                <th className="py-2.5 px-3 text-right">Total CFT</th>
+                <th className="py-2.5 px-3 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody" className="divide-y divide-slate-200 bg-white">
+              {summaryGroups.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-6 text-slate-400 font-medium">
+                    No summarized plan yet. Scan photo above or add plan entries.
+                  </td>
+                </tr>
+              ) : (
+                summaryGroups.map((group) => (
+                  <tr key={group.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{group.location}</span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {renderVehicleBadge(group.vehicleType)}
+                    </td>
+                    <td className="py-2.5 px-3 font-medium text-slate-700">
+                      {Array.from(group.transporters).join(', ') || 'ICRL'}
+                    </td>
+                    <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
+                      {group.totalDeliveries}
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-800">
+                      {group.totalWeight.toFixed(2)} Kg
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-bold text-indigo-700">
+                      {group.totalCft.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Ready for Dispatch</span>
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 2. DETAILED DELIVERIES TABLE (Item-wise) */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-0">
+        <div className="p-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 text-slate-600" />
+            <span>Detailed Delivery Breakup (Item-wise)</span>
+          </h3>
+          <span className="text-[11px] text-slate-500 font-medium">
+            {filteredPlans.length} Total Deliveries Listed
+          </span>
+        </div>
         {/* Floating Bulk Actions Bar when rows selected */}
         {selectedPlanIds.length > 0 && (
           <div className="p-3 bg-slate-900 text-white border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-150">

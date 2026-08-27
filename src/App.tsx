@@ -780,10 +780,10 @@ export default function App() {
               </button>
               <div>
                 <h1 className="text-sm sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-2">
-                  <span>Plan Received AHPL & AIL Tracker</span>
+                  <span>Plan Received AHPL & AIL Operations</span>
                 </h1>
                 <p className="text-[11px] text-slate-500 font-medium">
-                  Indore Hub • Live Multi-Device Sync Active
+                  Indore Hub • Location & Vehicle Wise Summary Active
                 </p>
               </div>
             </div>

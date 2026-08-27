@@ -62,7 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'plan',
-      label: lang === 'hi' ? 'प्लान रिसीव्ड (AHPL & AIL)' : 'Plan Received (AHPL & AIL)',
+      label: lang === 'hi' ? 'प्लान समरी एवं रिसीव्ड' : 'Plan Summary & Received',
       icon: <ClipboardList className="w-4 h-4" />,
       roles: ['ADMIN', 'SUPERVISOR'],
     },

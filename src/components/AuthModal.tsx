@@ -118,7 +118,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <ShieldCheck className="w-7 h-7" />
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">AHPL & AIL Logistics</h1>
-          <p className="text-xs text-slate-500 font-medium">Warehouse Access & Dock Portal</p>
+          <p className="text-xs text-slate-500 font-medium">Plan Received & Summary Portal</p>
         </div>
 
         {regSuccessMsg && (

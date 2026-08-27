@@ -1,6 +1,6 @@
 {
   "name": "AHPL & AIL Warehouse & Transport Hub",
-  "description": "AHPL & AIL - Plan Received & Dispatch Hub: Indore Hub multi-device sync, Plan Received (Delivery No, Code, Destination, Weight, CFT, Vehicle Type & Transporter), Dock Operations, Live Docks (1-9), Gate Security, and Reports & Export.",
+  "description": "AHPL & AIL - Plan Received & Summary Hub: Indore Hub location & vehicle wise plan summary, photo OCR scanner, live dock operations (1-9), gate security logs, and 2-way Google Sheets sync.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
