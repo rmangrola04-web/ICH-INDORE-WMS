@@ -58,30 +58,30 @@ const DEFAULT_ACCOUNTS: UserAccount[] = [
   {
     username: 'admin',
     password: 'admin123',
-    fullName: 'Operations Admin',
+    fullName: 'Admin User',
     role: 'ADMIN',
     avatarInitials: 'AD',
   },
   {
     username: 'supervisor',
     password: 'super123',
-    fullName: 'Rahul Prajapati',
+    fullName: 'Duty Supervisor',
     role: 'SUPERVISOR',
-    avatarInitials: 'RP',
+    avatarInitials: 'SUP',
   },
   {
     username: 'security',
     password: 'gate123',
-    fullName: 'R.K. Sharma',
+    fullName: 'Gate Security',
     role: 'SECURITY',
-    avatarInitials: 'RS',
+    avatarInitials: 'SEC',
   },
   {
     username: 'operator',
     password: 'op123',
-    fullName: 'Deepak Patel',
+    fullName: 'Dock Operator',
     role: 'OPERATOR',
-    avatarInitials: 'DP',
+    avatarInitials: 'OP',
   },
 ];
 
@@ -1013,8 +1013,9 @@ export default function App() {
                   placeholder="https://script.google.com/macros/s/.../exec"
                   className="w-full p-2.5 text-xs font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-                <p className="text-[11px] text-slate-400">
-                  Default constant in code: <code className="font-bold text-blue-700">GOOGLE_SCRIPT_URL</code>
+                <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Permanent 2-Way Sync Web App URL Locked & Connected</span>
                 </p>
               </div>
 

@@ -3,10 +3,9 @@ import { DockRecord, CompanyUnit, DailyPlanRecord, PlanExecutionStatus } from '.
 /**
  * 100% Live Google Sheets Synchronization Configuration
  * 
- * You can set your default Web App URL here or configure it directly
- * through the in-app Webhook / Live Sync settings panel.
+ * Permanent Web App URL locked for automatic 2-way synchronization.
  */
-export const GOOGLE_SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+export const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby3dqzP4328qg8tLMmVY-kiO9pV6yUS0ipOGS29MbVmjBH_QUu5WgzBV15vUgTdU6Kq/exec";
 
 const LOCAL_STORAGE_URL_KEY = 'ahpl_apps_script_url';
 
@@ -19,7 +18,7 @@ export function getActiveGoogleScriptUrl(): string {
   } catch (e) {
     console.warn('Could not read saved script URL', e);
   }
-  return GOOGLE_SCRIPT_URL !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL" ? GOOGLE_SCRIPT_URL : "";
+  return GOOGLE_SCRIPT_URL || "";
 }
 
 export function setActiveGoogleScriptUrl(url: string): void {
